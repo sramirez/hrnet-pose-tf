@@ -75,6 +75,20 @@ class HRNet():
 
         print(cnt)
 
+    def joints_mse_loss(out, gt):
+        batch_size = out.size(0)
+        num_joints = out.size(1)
+        heatmaps_pred = tf.reshape(out, [batch_size, num_joints, -1]).split(num_or_size_splits=1, axis=1)
+        heatmaps_gt = tf.reshape(gt, [batch_size, num_joints, -1]).split(num_or_size_splits=1, axis=1)
+        loss = 0
+
+        for idx in range(num_joints):
+            heatmap_pred = tf.squeeze(heatmaps_pred[idx])
+            heatmap_gt = tf.squeeze(heatmaps_gt[idx])
+            loss += 0.5 * tf.losses.mean_squared_error(heatmap_gt, heatmap_pred)
+
+        return loss / num_joints
+
     def calc_loss(self, labels, outputs, trainable_vars):
 
         loss = tf.losses.softmax_cross_entropy(labels, outputs)
