@@ -2,7 +2,7 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 from tensorflow.python.framework import ops
 from tensorflow.contrib.layers.python.layers import layers
-from net.head import ClsHead
+from net.head import PoseHead
 from net.stage import HRStage
 from net.front import HRFront
 from collections import Counter
@@ -59,6 +59,11 @@ class HRNet():
 
         return final_logit
 
+    def raw_test(self):
+        input = tf.ones((4, 256, 192, 3))
+        output = HRNet(input)
+        print(output)
+
     def model_summary(self):
 
         cnt = Counter()
@@ -104,10 +109,8 @@ class HRNet():
 
             self.stages.append(_stage)
 
-        clshead = ClsHead(base_channel=self.cfg['HEAD']['base_channel'],
-                          num_branches=self.cfg['HEAD']['num_branches'],
-                          cls_num=self.cfg['HEAD']['cls_num'],
-                          fc_channel=self.cfg['HEAD']['fc_channel'])
+        clshead = PoseHead(num_keypoints=self.cfg['HEAD']['num_keypoints'],
+                           final_conv_kernel=self.cfg['HEAD']['final_conv_kernel'])
 
         self.stages.append(clshead)
 
