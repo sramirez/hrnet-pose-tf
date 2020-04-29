@@ -19,12 +19,13 @@ class Trainer():
         self.data_scope = 'DATA'
         self.model_scope = 'HRNET'
 
+        # initialize network
+        self.hrnet = HRNet(netcfg)
+
         # initialize training & evaluation subsets
         self.dataset_train = Ilsvrc12Dataset(is_train=True, data_dir=data_path)
         self.dataset_eval = Ilsvrc12Dataset(is_train=False, data_dir=data_path)
 
-        # initialize network
-        self.hrnet = HRNet(netcfg)
 
         # learning rate
         self.lr_init = self.hrnet.cfg['COMMON']['lr_rate_init']

@@ -41,9 +41,9 @@ class HRNet():
             with slim.arg_scope([slim.conv2d],
                                 weights_initializer=he_normal_fanout(),
                                 weights_regularizer=slim.l2_regularizer(self.cfg['NET']['weight_l2_scale'])):
-                final_logit = self._forward(train_input)
+                final_output = self._forward(train_input)
 
-        return final_logit
+        return final_output
 
     def forward_eval(self, eval_input):
 
@@ -55,14 +55,9 @@ class HRNet():
         with slim.arg_scope([layers.batch_norm], **batch_norm_params):
             with slim.arg_scope([slim.conv2d],
                                 weights_regularizer=slim.l2_regularizer(self.cfg['NET']['weight_l2_scale'])):
-                final_logit = self._forward(eval_input)
+                final_output = self._forward(eval_input)
 
-        return final_logit
-
-    def raw_test(self):
-        input = tf.ones((4, 256, 192, 3))
-        output = HRNet(input)
-        print(output)
+        return final_output
 
     def model_summary(self):
 
@@ -75,11 +70,18 @@ class HRNet():
 
         print(cnt)
 
-    def joints_mse_loss(out, gt):
-        batch_size = out.size(0)
-        num_joints = out.size(1)
-        heatmaps_pred = tf.reshape(out, [batch_size, num_joints, -1]).split(num_or_size_splits=1, axis=1)
-        heatmaps_gt = tf.reshape(gt, [batch_size, num_joints, -1]).split(num_or_size_splits=1, axis=1)
+    def __adapt_output(self, x):
+        batch_size = x.get_shape()[0]
+        num_joints = x.get_shape()[3]
+        out = tf.transpose(x, perm=[0, 3, 1, 2])
+        out = tf.reshape(out, [batch_size, num_joints, -1])
+        out = tf.split(out, num_or_size_splits=1, axis=1)
+        return out
+
+    def joints_mse_loss(self, out, gt):
+        num_joints = out.get_shape()[3] # TODO:
+        heatmaps_pred = self.__adapt_output(out)
+        heatmaps_gt = self.__adapt_output(gt)
         loss = 0
 
         for idx in range(num_joints):
@@ -138,7 +140,6 @@ class HRNet():
 
     def _load_cfg(self, cfgfile):
         self.cfg = load_net_cfg_from_file(cfgfile)
-
 
     def _get_num_parameters(self):
         vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
