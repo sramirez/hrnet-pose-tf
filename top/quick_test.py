@@ -13,5 +13,7 @@ if __name__ == '__main__':
     input = tf.ones((4, 512, 512, 3)) # dimensions should be equal
     model = HRNet(FLAGS.net_cfg)
     output = model.forward_eval(input)
+    target = tf.ones((4, 512 // 4, 512 // 4, output.get_shape()[3]))
     print(output)
-    model.joints_mse_loss(output, input)
+    loss = model.joints_mse_loss(output, target)
+    print(loss)
