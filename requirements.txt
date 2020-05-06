@@ -7,11 +7,14 @@ h5py==2.9.0
 Keras-Applications==1.0.8
 Keras-Preprocessing==1.1.0
 Markdown==3.1.1
-netron==3.3.0
+#netron==3.3.0
+json_tricks
+pycocotools
 numpy==1.17.0
 protobuf==3.9.0
 six==1.12.0
 tensorboard==1.12.2
+opencv-python==3.4.1.15
 #tensorflow-gpu==1.12.0
 tensorflow==1.12.0
 termcolor==1.1.0

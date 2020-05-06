@@ -76,7 +76,6 @@ class HRNet():
         num_joints = x.get_shape()[3]
         out = tf.transpose(x, perm=[3, 0, 1, 2])
         out = tf.reshape(out, [num_joints, batch_size, -1])
-        #out = tf.split(out, num_or_size_splits=1, axis=1)
         return out
 
     def joints_mse_loss(self, out, gt):
