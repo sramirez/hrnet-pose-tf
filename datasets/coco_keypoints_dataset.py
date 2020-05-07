@@ -117,7 +117,15 @@ class coco_keypoints_dataset(joints_dataset):
         """
         size = max(1, min(subset, len(self.db)))
         print("Size: " + str(size))
-        dataset = tf.data.Dataset.from_tensor_slices([x for x in self.db[:size]])
+        i = 0
+        images = []
+        labels = []
+        while i < size:
+            input, target, _, _ = self[i]
+            images.append(input)
+            labels.append(target)
+            i += 1
+        dataset = tf.data.Dataset.from_tensor_slices((images, labels))
         dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(buffer_size=FLAGS.buffer_size))
         dataset = dataset.batch(self.batch_size)
         dataset = dataset.prefetch(FLAGS.prefetch_size)
@@ -294,7 +302,7 @@ class coco_keypoints_dataset(joints_dataset):
                 'joints_3d_vis': joints_3d_vis,
             })
 
-        logger.info('=> Total boxes after fliter low score@{}: {}'.format(
+        logger.info('=> Total boxes after filtering low score@{}: {}'.format(
             self.image_thre, num_boxes))
         return kpt_db
 
