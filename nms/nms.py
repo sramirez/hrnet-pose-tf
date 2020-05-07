@@ -115,9 +115,7 @@ def oks_nms(kpts_db, thresh, sigmas=None, in_vis_thre=None):
     while order.size > 0:
         i = order[0]
         keep.append(i)
-
         oks_ovr = oks_iou(kpts[i], kpts[order[1:]], areas[i], areas[order[1:]], sigmas, in_vis_thre)
-
         inds = np.where(oks_ovr <= thresh)[0]
         order = order[inds + 1]
 

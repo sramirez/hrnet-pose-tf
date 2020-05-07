@@ -14,6 +14,7 @@ import random
 
 import cv2
 import numpy as np
+import tensorflow as tf
 
 from utils.transforms import get_affine_transform
 from utils.transforms import affine_transform
@@ -21,10 +22,11 @@ from utils.transforms import fliplr_joints
 
 
 logger = logging.getLogger(__name__)
+mean = [0.485, 0.456, 0.406]
+std = [0.229, 0.224, 0.225]
 
-
-class joints_dataset(Dataset):
-    def __init__(self, cfg, root, image_set, is_train, transform=None):
+class joints_dataset():
+    def __init__(self, cfg, root, image_set, is_train, transform=None, normalize=True):
         self.num_joints = 0
         self.pixel_std = 200
         self.flip_pairs = []
@@ -34,21 +36,22 @@ class joints_dataset(Dataset):
         self.root = root
         self.image_set = image_set
 
-        self.output_path = cfg.OUTPUT_DIR
-        self.data_format = cfg.DATASET.DATA_FORMAT
+        #self.output_path = cfg.OUTPUT_DIR
+        self.norm_mean = cfg['FRONT']['norm_mean']
+        self.norm_std = cfg['FRONT']['norm_std']
+        self.data_format = cfg['DATASET']['DATA_FORMAT']
+        self.scale_factor = cfg['DATASET']['SCALE_FACTOR']
+        self.rotation_factor = cfg['DATASET']['ROT_FACTOR']
+        self.flip = cfg['DATASET']['FLIP']
+        self.num_joints_half_body = cfg['DATASET']['NUM_JOINTS_HALF_BODY']
+        self.prob_half_body = cfg['DATASET']['PROB_HALF_BODY']
+        self.color_rgb = cfg['DATASET']['COLOR_RGB']
 
-        self.scale_factor = cfg.DATASET.SCALE_FACTOR
-        self.rotation_factor = cfg.DATASET.ROT_FACTOR
-        self.flip = cfg.DATASET.FLIP
-        self.num_joints_half_body = cfg.DATASET.NUM_JOINTS_HALF_BODY
-        self.prob_half_body = cfg.DATASET.PROB_HALF_BODY
-        self.color_rgb = cfg.DATASET.COLOR_RGB
-
-        self.target_type = cfg.MODEL.TARGET_TYPE
-        self.image_size = np.array(cfg.MODEL.IMAGE_SIZE)
-        self.heatmap_size = np.array(cfg.MODEL.HEATMAP_SIZE)
-        self.sigma = cfg.MODEL.SIGMA
-        self.use_different_joints_weight = cfg.LOSS.USE_DIFFERENT_JOINTS_WEIGHT
+        self.target_type = cfg['MODEL']['TARGET_TYPE']
+        self.image_size = np.array(cfg['MODEL']['image_size'])
+        self.heatmap_size = np.array((cfg['MODEL']['heatmap_size']))
+        self.sigma = cfg['MODEL']['sigma']
+        self.use_different_joints_weight = cfg['LOSS']['USE_DIFFERENT_JOINTS_WEIGHT']
         self.joints_weight = 1
 
         self.transform = transform
@@ -140,6 +143,7 @@ class joints_dataset(Dataset):
         score = db_rec['score'] if 'score' in db_rec else 1
         r = 0
 
+        # Data augmentation
         if self.is_train:
             if (np.sum(joints_vis[:, 0]) > self.num_joints_half_body
                 and np.random.rand() < self.prob_half_body):
@@ -169,8 +173,8 @@ class joints_dataset(Dataset):
             (int(self.image_size[0]), int(self.image_size[1])),
             flags=cv2.INTER_LINEAR)
 
-        if self.transform:
-            input = self.transform(input)
+        if self.normalize:
+            input = input - mean / std
 
         for i in range(self.num_joints):
             if joints_vis[i, 0] > 0.0:
@@ -178,8 +182,10 @@ class joints_dataset(Dataset):
 
         target, target_weight = self.generate_target(joints, joints_vis)
 
-        target = torch.from_numpy(target)
-        target_weight = torch.from_numpy(target_weight)
+        # Go to tensors
+        input = tf.convert_to_tensor(input, dtype=tf.float32)
+        target = tf.convert_to_tensor(target, dtype=tf.float32)
+        target_weight = tf.convert_to_tensor(target_weight, dtype=tf.float32)
 
         meta = {
             'image': image_file,

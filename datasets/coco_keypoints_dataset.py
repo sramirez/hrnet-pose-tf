@@ -17,12 +17,20 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 import json_tricks as json
 import numpy as np
+import tensorflow as tf
 
-from datasets.joints_dataset import joints_dataset
+from datasets import joints_dataset
 from nms.nms import oks_nms
 from nms.nms import soft_oks_nms
 
 logger = logging.getLogger(__name__)
+
+FLAGS = tf.app.flags.FLAGS
+
+tf.app.flags.DEFINE_integer('batch_size', 32, 'batch size per GPU for training')
+tf.app.flags.DEFINE_integer('buffer_size', 1024, '# of elements to be buffered when prefetching')
+tf.app.flags.DEFINE_integer('prefetch_size', 8, '# of mini-batches to be buffered when prefetching')
+
 
 class coco_keypoints_dataset(joints_dataset):
     '''
@@ -51,17 +59,18 @@ class coco_keypoints_dataset(joints_dataset):
     '''
     def __init__(self, cfg, root, image_set, is_train, transform=None):
         super().__init__(cfg, root, image_set, is_train, transform)
-        self.nms_thre = cfg.TEST.NMS_THRE
-        self.image_thre = cfg.TEST.IMAGE_THRE
-        self.soft_nms = cfg.TEST.SOFT_NMS
-        self.oks_thre = cfg.TEST.OKS_THRE
-        self.in_vis_thre = cfg.TEST.IN_VIS_THRE
-        self.bbox_file = cfg.TEST.COCO_BBOX_FILE
-        self.use_gt_bbox = cfg.TEST.USE_GT_BBOX
-        self.image_width = cfg.MODEL.IMAGE_SIZE[0]
-        self.image_height = cfg.MODEL.IMAGE_SIZE[1]
+        self.nms_thre = cfg['TEST']['nms_thre']
+        self.image_thre = cfg['TEST']['image_thre']
+        self.soft_nms = cfg['TEST']['soft_nms']
+        self.oks_thre = cfg['TEST']['oks_thre']
+        self.in_vis_thre = cfg['TEST']['in_vis_thre']
+        self.bbox_file = cfg['TEST']['coco_bbox_file']
+        self.use_gt_bbox = cfg['TEST']['use_gt_bbox']
+        self.image_width = cfg['MODEL']['image_size'][0]
+        self.image_height = cfg['MODEL']['image_size'][1]
         self.aspect_ratio = self.image_width * 1.0 / self.image_height
         self.pixel_std = 200
+        self.batch_size = FLAGS.batch_size
 
         self.coco = COCO(self._get_ann_file_keypoint())
 
@@ -85,27 +94,34 @@ class coco_keypoints_dataset(joints_dataset):
         self.num_images = len(self.image_set_index)
         logger.info('=> num_images: {}'.format(self.num_images))
 
-        self.num_joints = 17
-        self.flip_pairs = [[1, 2], [3, 4], [5, 6], [7, 8],
-                           [9, 10], [11, 12], [13, 14], [15, 16]]
+        self.num_joints = cfg['HEAD']['num_keypoints']
+        self.flip_pairs = cfg['HEAD']['flip_pairs']
         self.parent_ids = None
-        self.upper_body_ids = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-        self.lower_body_ids = (11, 12, 13, 14, 15, 16)
+        self.upper_body_ids = cfg['HEAD']['upper_body_ids']
+        self.lower_body_ids = cfg['HEAD']['lower_body_ids']
+        self.joints_weight = np.array(cfg['HEAD']['joints_weights'], dtype=np.float32).reshape((self.num_joints, 1))
 
-        self.joints_weight = np.array(
-            [
-                1., 1., 1., 1., 1., 1., 1., 1.2, 1.2,
-                1.5, 1.5, 1., 1., 1.2, 1.2, 1.5, 1.5
-            ],
-            dtype=np.float32
-        ).reshape((self.num_joints, 1))
-
+        # Pre-process and load all images
         self.db = self._get_db()
 
         if is_train and cfg.DATASET.SELECT_DATA:
             self.db = self.select_data(self.db)
 
         logger.info('=> load {} samples'.format(len(self.db)))
+
+    def make_iterator(self):
+        """Make an iterator from self.db
+
+        Returns:
+        * iterator: iterator for the already initialized dataset
+        """
+        dataset = tf.data.Dataset.from_tensor_slices([x for x in self.db])
+        dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(buffer_size=FLAGS.buffer_size))
+        dataset = dataset.batch(self.batch_size)
+        dataset = dataset.prefetch(FLAGS.prefetch_size)
+        iterator = dataset.make_one_shot_iterator()
+
+        return iterator
 
     def _get_ann_file_keypoint(self):
         """ self.root / annotations / person_keypoints_train2017.json """
@@ -194,7 +210,7 @@ class coco_keypoints_dataset(joints_dataset):
 
             center, scale = self._box2cs(obj['clean_bbox'][:4])
             rec.append({
-                'image': self.image_path_from_index(index),
+                'image': self._image_path_from_index(index),
                 'center': center,
                 'scale': scale,
                 'joints_3d': joints_3d,
@@ -226,7 +242,7 @@ class coco_keypoints_dataset(joints_dataset):
 
         return center, scale
 
-    def image_path_from_index(self, index):
+    def _image_path_from_index(self, index):
         """ example: images / train2017 / 000000119993.jpg """
         file_name = '%012d.jpg' % index
         if '2014' in self.image_set:
@@ -242,14 +258,12 @@ class coco_keypoints_dataset(joints_dataset):
         return image_path
 
     def _load_coco_person_detection_results(self):
-        all_boxes = None
-        with open(self.bbox_file, 'r') as f:
-            all_boxes = json.load(f)
-
-        if not all_boxes:
+        try:
+            with open(self.bbox_file, 'r') as f:
+                all_boxes = json.load(f)
+        except IOError:
             logger.error('=> Load %s fail!' % self.bbox_file)
             return None
-
         logger.info('=> Total boxes: {}'.format(len(all_boxes)))
 
         kpt_db = []
@@ -258,19 +272,17 @@ class coco_keypoints_dataset(joints_dataset):
             det_res = all_boxes[n_img]
             if det_res['category_id'] != 1:
                 continue
-            img_name = self.image_path_from_index(det_res['image_id'])
+            img_name = self._image_path_from_index(det_res['image_id'])
             box = det_res['bbox']
             score = det_res['score']
-
             if score < self.image_thre:
                 continue
-
             num_boxes = num_boxes + 1
-
             center, scale = self._box2cs(box)
             joints_3d = np.zeros((self.num_joints, 3), dtype=np.float)
             joints_3d_vis = np.ones(
                 (self.num_joints, 3), dtype=np.float)
+
             kpt_db.append({
                 'image': img_name,
                 'center': center,
@@ -284,10 +296,8 @@ class coco_keypoints_dataset(joints_dataset):
             self.image_thre, num_boxes))
         return kpt_db
 
-    def evaluate(self, cfg, preds, output_dir, all_boxes, img_path,
-                 *args, **kwargs):
+    def evaluate(self, cfg, preds, output_dir, all_boxes, img_path):
         rank = cfg.RANK
-
         res_folder = os.path.join(output_dir, 'results')
         if not os.path.exists(res_folder):
             try:
@@ -353,11 +363,9 @@ class coco_keypoints_dataset(joints_dataset):
             else:
                 oks_nmsed_kpts.append([img_kpts[_keep] for _keep in keep])
 
-        self._write_coco_keypoint_results(
-            oks_nmsed_kpts, res_file)
+        self._write_coco_keypoint_results(oks_nmsed_kpts, res_file)
         if 'test' not in self.image_set:
-            info_str = self._do_python_keypoint_eval(
-                res_file, res_folder)
+            info_str = self._do_python_keypoint_eval(res_file, res_folder)
             name_value = OrderedDict(info_str)
             return name_value, name_value['AP']
         else:
@@ -426,7 +434,7 @@ class coco_keypoints_dataset(joints_dataset):
 
         return cat_results
 
-    def _do_python_keypoint_eval(self, res_file, res_folder):
+    def _do_python_keypoint_eval(self, res_file):
         coco_dt = self.coco.loadRes(res_file)
         coco_eval = COCOeval(self.coco, coco_dt, 'keypoints')
         coco_eval.params.useSegm = None
