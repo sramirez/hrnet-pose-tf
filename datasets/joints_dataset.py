@@ -31,6 +31,7 @@ class joints_dataset():
         self.pixel_std = 200
         self.flip_pairs = []
         self.parent_ids = []
+        self.normalize = normalize
 
         self.is_train = is_train
         self.root = root
@@ -39,19 +40,19 @@ class joints_dataset():
         #self.output_path = cfg.OUTPUT_DIR
         self.norm_mean = cfg['FRONT']['norm_mean']
         self.norm_std = cfg['FRONT']['norm_std']
-        self.data_format = cfg['DATASET']['DATA_FORMAT']
-        self.scale_factor = cfg['DATASET']['SCALE_FACTOR']
-        self.rotation_factor = cfg['DATASET']['ROT_FACTOR']
-        self.flip = cfg['DATASET']['FLIP']
-        self.num_joints_half_body = cfg['DATASET']['NUM_JOINTS_HALF_BODY']
-        self.prob_half_body = cfg['DATASET']['PROB_HALF_BODY']
-        self.color_rgb = cfg['DATASET']['COLOR_RGB']
+        self.data_format = cfg['DATASET']['data_format']
+        self.scale_factor = cfg['DATASET']['scale_factor']
+        self.rotation_factor = cfg['DATASET']['rot_factor']
+        self.flip = cfg['DATASET']['flip']
+        self.num_joints_half_body = cfg['DATASET']['num_joints_half_body']
+        self.prob_half_body = cfg['DATASET']['prob_half_body']
+        self.color_rgb = cfg['DATASET']['color_rgb']
 
-        self.target_type = cfg['MODEL']['TARGET_TYPE']
+        self.target_type = cfg['MODEL']['target_type']
         self.image_size = np.array(cfg['MODEL']['image_size'])
         self.heatmap_size = np.array((cfg['MODEL']['heatmap_size']))
         self.sigma = cfg['MODEL']['sigma']
-        self.use_different_joints_weight = cfg['LOSS']['USE_DIFFERENT_JOINTS_WEIGHT']
+        self.use_different_joints_weight = cfg['LOSS']['use_different_joints_weight']
         self.joints_weight = 1
 
         self.transform = transform
@@ -174,7 +175,7 @@ class joints_dataset():
             flags=cv2.INTER_LINEAR)
 
         if self.normalize:
-            input = input - mean / std
+            input = (input - mean) / std
 
         for i in range(self.num_joints):
             if joints_vis[i, 0] > 0.0:

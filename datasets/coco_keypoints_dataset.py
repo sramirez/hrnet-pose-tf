@@ -19,7 +19,7 @@ import json_tricks as json
 import numpy as np
 import tensorflow as tf
 
-from datasets import joints_dataset
+from datasets.joints_dataset import joints_dataset
 from nms.nms import oks_nms
 from nms.nms import soft_oks_nms
 
@@ -59,13 +59,13 @@ class coco_keypoints_dataset(joints_dataset):
     '''
     def __init__(self, cfg, root, image_set, is_train, transform=None):
         super().__init__(cfg, root, image_set, is_train, transform)
-        self.nms_thre = cfg['TEST']['nms_thre']
-        self.image_thre = cfg['TEST']['image_thre']
-        self.soft_nms = cfg['TEST']['soft_nms']
-        self.oks_thre = cfg['TEST']['oks_thre']
-        self.in_vis_thre = cfg['TEST']['in_vis_thre']
-        self.bbox_file = cfg['TEST']['coco_bbox_file']
-        self.use_gt_bbox = cfg['TEST']['use_gt_bbox']
+        self.bbox_file = cfg['DATASET']['coco_bbox_file']
+        self.nms_thre = cfg['POST']['nms_thre']
+        self.image_thre = cfg['POST']['image_thre']
+        self.soft_nms = cfg['POST']['soft_nms']
+        self.oks_thre = cfg['POST']['oks_thre']
+        self.in_vis_thre = cfg['POST']['in_vis_thre']
+        self.use_gt_bbox = cfg['POST']['use_gt_bbox']
         self.image_width = cfg['MODEL']['image_size'][0]
         self.image_height = cfg['MODEL']['image_size'][1]
         self.aspect_ratio = self.image_width * 1.0 / self.image_height
@@ -109,13 +109,15 @@ class coco_keypoints_dataset(joints_dataset):
 
         logger.info('=> load {} samples'.format(len(self.db)))
 
-    def make_iterator(self):
+    def build(self, subset=10e10):
         """Make an iterator from self.db
 
         Returns:
         * iterator: iterator for the already initialized dataset
         """
-        dataset = tf.data.Dataset.from_tensor_slices([x for x in self.db])
+        size = max(1, min(subset, len(self.db)))
+        print("Size: " + str(size))
+        dataset = tf.data.Dataset.from_tensor_slices([x for x in self.db[:size]])
         dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(buffer_size=FLAGS.buffer_size))
         dataset = dataset.batch(self.batch_size)
         dataset = dataset.prefetch(FLAGS.prefetch_size)
@@ -143,7 +145,7 @@ class coco_keypoints_dataset(joints_dataset):
             # use ground truth bbox
             gt_db = self._load_coco_keypoint_annotations()
         else:
-            # use bbox from detection
+            # use bbox from detection (for example, YOLO)
             gt_db = self._load_coco_person_detection_results()
         return gt_db
 
@@ -268,8 +270,8 @@ class coco_keypoints_dataset(joints_dataset):
 
         kpt_db = []
         num_boxes = 0
-        for n_img in range(0, len(all_boxes)):
-            det_res = all_boxes[n_img]
+        cnt = 0
+        for det_res in all_boxes:
             if det_res['category_id'] != 1:
                 continue
             img_name = self._image_path_from_index(det_res['image_id'])

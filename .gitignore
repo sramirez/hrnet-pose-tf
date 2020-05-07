@@ -4,6 +4,8 @@
 main.py
 logs
 models
+venv
+data
 models_*
 automl_output_*
 .pylint_results
@@ -13,4 +15,3 @@ path.conf
 nvidia-smi-dump
 ssd_outputs
 dump
-/venv/
