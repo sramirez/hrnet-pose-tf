@@ -30,6 +30,11 @@ FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer('batch_size', 32, 'batch size per GPU for training')
 tf.app.flags.DEFINE_integer('buffer_size', 1024, '# of elements to be buffered when prefetching')
 tf.app.flags.DEFINE_integer('prefetch_size', 8, '# of mini-batches to be buffered when prefetching')
+#tf.app.flags.DEFINE_integer('nb_smpls_train', 1281167, '# of samples for training') # TODO: check why this is needed
+tf.app.flags.DEFINE_integer('nb_smpls_val', 10000, '# of samples for validation')
+#tf.app.flags.DEFINE_integer('nb_smpls_eval', 50000, '# of samples for evaluation')
+tf.app.flags.DEFINE_integer('batch_size_eval', 32, 'batch size for evaluation')
+
 
 
 class coco_keypoints_dataset(joints_dataset):

@@ -22,15 +22,15 @@ class Trainer():
         self.hrnet = HRNet(netcfg)
 
         # initialize training & evaluation subsets
-        self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, "../data/coco/",
-                                                    self.hrnet.cfg['DATASET']['test_set'], False) # we don't have COCO train downloaded
+        #self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, "../data/coco/",
+        #                                            self.hrnet.cfg['DATASET']['test_set'], False) # we don't have COCO train downloaded
         self.dataset_eval = coco_keypoints_dataset(self.hrnet.cfg, "../data/coco/",
                                                    self.hrnet.cfg['DATASET']['test_set'], False)
 
         # learning rate
         self.lr_init = self.hrnet.cfg['COMMON']['lr_rate_init']
-        self.model_path = './models'
-        self.log_path = './logs'
+        self.model_path = '../models'
+        self.log_path = '../logs'
         self.summ_step = self.hrnet.cfg['COMMON']['summary_step']
         self.save_step = self.hrnet.cfg['COMMON']['save_step']
         self.nb_iters_start = 0
@@ -73,7 +73,6 @@ class Trainer():
                 if is_train:
                     self.global_step = tf.train.get_or_create_global_step()
                     lrn_rate, self.nb_iters_train = self.setup_lrn_rate(self.global_step)
-
                     optimizer = tf.train.MomentumOptimizer(lrn_rate, self.hrnet.cfg['COMMON']['momentum'])
                     if FLAGS.enbl_multi_gpu:
                         optimizer = mgw.DistributedOptimizer(optimizer)
@@ -83,7 +82,6 @@ class Trainer():
             print(self.vars)
             if is_train:
                 self.sess_train = sess
-
                 with tf.control_dependencies(self.update_ops):
                     self.train_op = optimizer.apply_gradients(grads, global_step=self.global_step)
 
@@ -99,7 +97,9 @@ class Trainer():
                 self.sess_eval = sess
                 self.eval_op = [loss] + list(metrics.values())
                 self.eval_op_names = ['loss'] + list(metrics.keys())
-                self.saver_eval = tf.train.Saver(self.vars)
+                vars_to_restore = self.vars if self.hrnet.cfg['HEAD']['load_weights'] \
+                    else [x for x in self.vars if 'HEAD' not in x.name]
+                self.saver_eval = tf.train.Saver(vars_to_restore)
 
     def train(self):
         """Train a model and periodically produce checkpoint files."""
@@ -143,11 +143,6 @@ class Trainer():
             self.eval()
 
     def eval(self):
-        # restore model first
-        variables_to_restore = [var for var in tf.global_variables()
-                                if var.name.startswith('conv_1')
-                                or var.name.startswith('conv_2')] # TODO: fill in appropiately
-        saver = tf.train.Saver(variables_to_restore)
         ckpt_path = self.__restore_model(self.saver_eval, self.sess_eval)
         tf.logging.info('restore from %s' % (ckpt_path))
 

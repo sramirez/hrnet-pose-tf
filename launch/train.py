@@ -17,20 +17,17 @@ def main(unused_argv):
     Args:
     * unused_argv: unused arguments (after FLAGS is parsed)
     """
-
     tf.logging.set_verbosity(tf.logging.INFO)
 
     if FLAGS.enbl_multi_gpu:
         mgw.init()
 
     trainer = Trainer(data_path=FLAGS.data_path, netcfg=FLAGS.net_cfg)
-
-    trainer.build_graph(is_train=True)
-    trainer.build_graph(is_train=False)
-
     if FLAGS.eval_only:
+        trainer.build_graph(is_train=False)
         trainer.eval()
     else:
+        trainer.build_graph(is_train=True)
         trainer.train()
 
 
