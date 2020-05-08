@@ -64,7 +64,7 @@ class Trainer():
                         tf.add_to_collection('logits_final', value)
 
                 # loss & extra evaluation metrics
-                loss, metrics = JointsMSELoss()(labels, logits, self.trainable_vars)
+                loss, metrics = JointsMSELoss()(labels, logits)
 
                 tf.summary.scalar('loss', loss)
                 for key, value in metrics.items():

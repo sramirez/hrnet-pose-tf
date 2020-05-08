@@ -71,20 +71,6 @@ class HRNet():
 
         print(cnt)
 
-    def calc_loss(self, labels, outputs, trainable_vars):
-
-        loss = tf.losses.softmax_cross_entropy(labels, outputs)
-        l2_loss = tf.add_n([tf.nn.l2_loss(var) * self.cfg['NET']['weight_l2_scale'] for var in trainable_vars])
-        loss += l2_loss
-
-        targets = tf.argmax(labels, axis=1)
-        acc_top1 = tf.reduce_mean(tf.cast(tf.nn.in_top_k(outputs, targets, 1), tf.float32))
-        acc_top5 = tf.reduce_mean(tf.cast(tf.nn.in_top_k(outputs, targets, 5), tf.float32))
-
-        metrics = {'acc_top1': acc_top1, 'acc_top5': acc_top5, 'l2_loss': l2_loss}
-
-        return loss, metrics
-
     def _build_components(self):
 
         front = HRFront(num_channels=self.cfg['FRONT']['num_channels'],

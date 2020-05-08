@@ -15,7 +15,7 @@ tf.app.flags.DEFINE_bool('resume_training', False, 'resume training')
 def loss_test():
     output = tf.zeros((4, 512 // 4, 512 // 4, 17)) # dimensions should be equal
     target = tf.ones((4, 512 // 4, 512 // 4, 17))
-    loss = JointsMSELoss()(output, target)
+    loss, _ = JointsMSELoss()(output, target)
     print(loss)
     with tf.Session() as sess:
         with tf.device("/cpu:0"): # or `with sess:` to close on exit
@@ -29,7 +29,7 @@ def quick_test():
     output = model.forward_eval(input)
     print(output)
     target = tf.ones((4, 512 // 4, 512 // 4, output.get_shape()[3]))
-    loss = JointsMSELoss()(output, target)
+    loss, _ = JointsMSELoss()(output, target)
     print(loss)
     with tf.Session() as sess:
         with tf.device("/cpu:0"):
@@ -44,7 +44,7 @@ def full_test():
     output = model.forward_eval(images)
     print(output)
     print(labels)
-    loss = model.joints_mse_loss(output, labels)
+    loss, _ = JointsMSELoss()(output, labels)
     print(loss)
 
 if __name__ == '__main__':

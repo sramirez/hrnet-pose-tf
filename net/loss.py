@@ -21,5 +21,6 @@ class JointsMSELoss(object):
             heatmap_gt = tf.squeeze(heatmaps_gt[idx])
             loss += 0.5 * tf.losses.mean_squared_error(heatmap_gt, heatmap_pred,
                                                        reduction=tf.losses.Reduction.MEAN)
-
-        return tf.div(loss, tf.cast(num_joints, tf.float32))
+        mse_loss = tf.div(loss, tf.cast(num_joints, tf.float32))
+        metrics = {'mse_loss': mse_loss}
+        return mse_loss, metrics
