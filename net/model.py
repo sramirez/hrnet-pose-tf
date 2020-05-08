@@ -6,7 +6,7 @@ from net.head import PoseHead
 from net.stage import HRStage
 from net.front import HRFront
 from collections import Counter
-from utils.config import load_net_cfg_from_file
+from netutils.config import load_net_cfg_from_file
 import functools
 
 from tensorflow.python.ops.init_ops import VarianceScaling

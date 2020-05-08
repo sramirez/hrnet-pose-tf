@@ -1,12 +1,10 @@
-import tensorflow as tf
-
-from utils.misc_utils import auto_barrier as auto_barrier_impl
-from utils.misc_utils import is_primary_worker as is_primary_worker_impl
-from utils.multi_gpu_wrapper import MultiGpuWrapper as mgw
-from datasets.ilsvrc12_dataset import Ilsvrc12Dataset
+from netutils.misc_utils import auto_barrier as auto_barrier_impl
+from netutils.misc_utils import is_primary_worker as is_primary_worker_impl
+from netutils.multi_gpu_wrapper import MultiGpuWrapper as mgw
 from net.model import HRNet
 from net.loss import JointsMSELoss
-from trainer.utils import *
+from datasets.coco_keypoints_dataset import coco_keypoints_dataset
+from launch.utils import *
 from timeit import default_timer as timer
 import numpy as np
 import os
@@ -24,9 +22,10 @@ class Trainer():
         self.hrnet = HRNet(netcfg)
 
         # initialize training & evaluation subsets
-        self.dataset_train = Ilsvrc12Dataset(is_train=True, data_dir=data_path)
-        self.dataset_eval = Ilsvrc12Dataset(is_train=False, data_dir=data_path)
-
+        self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, "../data/coco/",
+                                                    self.hrnet.cfg['DATASET']['test_set'], False) # we don't have COCO train downloaded
+        self.dataset_eval = coco_keypoints_dataset(self.hrnet.cfg, "../data/coco/",
+                                                   self.hrnet.cfg['DATASET']['test_set'], False)
 
         # learning rate
         self.lr_init = self.hrnet.cfg['COMMON']['lr_rate_init']
@@ -46,7 +45,7 @@ class Trainer():
 
             # data input pipeline
             with tf.variable_scope(self.data_scope):
-                iterator = self.dataset_train.build() if is_train else self.dataset_eval.build()
+                iterator = self.dataset_train.build(subset=10) if is_train else self.dataset_eval.build(subset=10) # TODO: remove subsetting
                 images, labels = iterator.get_next()
                 if not isinstance(images, dict):
                     tf.add_to_collection('images_final', images)
@@ -64,7 +63,7 @@ class Trainer():
                         tf.add_to_collection('logits_final', value)
 
                 # loss & extra evaluation metrics
-                loss, metrics = JointsMSELoss()(labels, logits)
+                loss, metrics = JointsMSELoss()(logits, labels)
 
                 tf.summary.scalar('loss', loss)
                 for key, value in metrics.items():
@@ -81,6 +80,7 @@ class Trainer():
                     grads = optimizer.compute_gradients(loss, self.trainable_vars)
 
             # TF operations & model saver
+            print(self.vars)
             if is_train:
                 self.sess_train = sess
 
@@ -108,7 +108,7 @@ class Trainer():
         self.sess_train.run(self.init_op)
 
         if FLAGS.resume_training:
-            save_path = tf.train.latest_checkpoint(os.path.dirname(self.model_path+'/model.ckpt'))
+            save_path = tf.train.latest_checkpoint(os.path.dirname(self.model_path + '/model.ckpt'))
             self.saver_train.restore(self.sess_train, save_path)
             self.nb_iters_start = get_global_step_from_ckpt(save_path)
 
@@ -144,6 +144,10 @@ class Trainer():
 
     def eval(self):
         # restore model first
+        variables_to_restore = [var for var in tf.global_variables()
+                                if var.name.startswith('conv_1')
+                                or var.name.startswith('conv_2')] # TODO: fill in appropiately
+        saver = tf.train.Saver(variables_to_restore)
         ckpt_path = self.__restore_model(self.saver_eval, self.sess_eval)
         tf.logging.info('restore from %s' % (ckpt_path))
 

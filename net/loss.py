@@ -4,23 +4,16 @@ import tensorflow as tf
 class JointsMSELoss(object):
 
     def __adapt_output(self, x):
-        batch_size = x.get_shape()[0]
-        num_joints = x.get_shape()[3]
+        batch_size = tf.shape(x)[0]
+        num_joints = tf.shape(x)[-1]
         out = tf.transpose(x, perm=[3, 0, 1, 2])
-        out = tf.reshape(out, [num_joints, batch_size, -1])
+        out = tf.reshape(out, (num_joints, batch_size, -1))
         return out
 
-    def __call__(self, out, gt):
-        num_joints = out.get_shape()[3]
-        heatmaps_pred = self.__adapt_output(out)
-        heatmaps_gt = self.__adapt_output(gt)
-        loss = 0.0
-
-        for idx in range(num_joints):
-            heatmap_pred = tf.squeeze(heatmaps_pred[idx])
-            heatmap_gt = tf.squeeze(heatmaps_gt[idx])
-            loss += 0.5 * tf.losses.mean_squared_error(heatmap_gt, heatmap_pred,
-                                                       reduction=tf.losses.Reduction.MEAN)
-        mse_loss = tf.div(loss, tf.cast(num_joints, tf.float32))
-        metrics = {'mse_loss': mse_loss}
-        return mse_loss, metrics
+    def __call__(self, out, gt): # TODO: apply class weights (keypoints)
+        hout = self.__adapt_output(out)
+        hgt = self.__adapt_output(gt)
+        diff = tf.square(tf.subtract(hout, hgt)) * 0.5
+        loss = tf.reduce_mean(tf.reduce_mean(diff), name='loss')
+        metrics = {'mse_loss': loss}
+        return loss, metrics

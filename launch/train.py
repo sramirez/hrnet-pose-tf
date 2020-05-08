@@ -1,6 +1,6 @@
 import tensorflow as tf
-from trainer.trainer import Trainer
-from utils.multi_gpu_wrapper import MultiGpuWrapper as mgw
+from launch.trainer import Trainer
+from netutils.multi_gpu_wrapper import MultiGpuWrapper as mgw
 
 FLAGS = tf.app.flags.FLAGS
 

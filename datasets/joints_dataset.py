@@ -16,9 +16,9 @@ import cv2
 import numpy as np
 import tensorflow as tf
 
-from utils.transforms import get_affine_transform
-from utils.transforms import affine_transform
-from utils.transforms import fliplr_joints
+from netutils.transforms import get_affine_transform
+from netutils.transforms import affine_transform
+from netutils.transforms import fliplr_joints
 
 
 logger = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ class joints_dataset():
         imgnum = db_rec['imgnum'] if 'imgnum' in db_rec else ''
 
         if self.data_format == 'zip':
-            from utils import zipreader
+            from netutils import zipreader
             data_numpy = zipreader.imread(
                 image_file, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION
             )

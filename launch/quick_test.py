@@ -1,7 +1,7 @@
 import tensorflow as tf
 from net.model import HRNet
 from datasets.coco_keypoints_dataset import coco_keypoints_dataset
-from utils import config
+from netutils import config
 from net.loss import JointsMSELoss
 
 FLAGS = tf.app.flags.FLAGS
@@ -45,7 +45,10 @@ def full_test():
     print(output)
     print(labels)
     loss, _ = JointsMSELoss()(output, labels)
-    print(loss)
+    with tf.Session() as sess:
+        with tf.device("/cpu:0"):
+            real_loss = sess.run(loss)
+            print(real_loss)
 
 if __name__ == '__main__':
     quick_test()

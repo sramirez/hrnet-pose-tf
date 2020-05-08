@@ -20,7 +20,7 @@ import os
 import tensorflow as tf
 
 from datasets.abstract_dataset import AbstractDataset
-from utils.imagenet_preprocessing import preprocess_image
+from netutils.imagenet_preprocessing import preprocess_image
 
 FLAGS = tf.app.flags.FLAGS
 

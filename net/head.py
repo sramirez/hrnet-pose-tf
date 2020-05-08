@@ -1,6 +1,3 @@
-import tensorflow as tf
-import tensorflow.contrib.slim as slim
-from tensorflow.contrib.layers.python.layers import batch_norm
 from net.layers import *
 from net.utils import *
 

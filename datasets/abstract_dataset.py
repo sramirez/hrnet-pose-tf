@@ -19,7 +19,7 @@
 from abc import ABC
 import tensorflow as tf
 
-from utils.multi_gpu_wrapper import MultiGpuWrapper as mgw
+from netutils.multi_gpu_wrapper import MultiGpuWrapper as mgw
 
 FLAGS = tf.app.flags.FLAGS
 
