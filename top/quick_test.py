@@ -2,6 +2,7 @@ import tensorflow as tf
 from net.model import HRNet
 from datasets.coco_keypoints_dataset import coco_keypoints_dataset
 from utils import config
+from net.loss import JointsMSELoss
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -11,15 +12,28 @@ tf.app.flags.DEFINE_string('net_cfg', '../cfgs/w30_s4.cfg', 'config file of netw
 tf.app.flags.DEFINE_bool('eval_only', False, 'Eval mode')
 tf.app.flags.DEFINE_bool('resume_training', False, 'resume training')
 
+def loss_test():
+    output = tf.zeros((4, 512 // 4, 512 // 4, 17)) # dimensions should be equal
+    target = tf.ones((4, 512 // 4, 512 // 4, 17))
+    loss = JointsMSELoss()(output, target)
+    print(loss)
+    with tf.Session() as sess:
+        with tf.device("/cpu:0"): # or `with sess:` to close on exit
+            out = sess.run(loss)
+            assert out == 0.5
+            print(out)
+
 def quick_test():
-    cfg = config.load_net_cfg_from_file(FLAGS.net_cfg)
     input = tf.ones((4, 512, 512, 3)) # dimensions should be equal
     model = HRNet(FLAGS.net_cfg)
     output = model.forward_eval(input)
     print(output)
     target = tf.ones((4, 512 // 4, 512 // 4, output.get_shape()[3]))
-    loss = model.joints_mse_loss(output, target)
+    loss = JointsMSELoss()(output, target)
     print(loss)
+    with tf.Session() as sess:
+        with tf.device("/cpu:0"):
+            sess.run(loss)
 
 def full_test():
     cfg = config.load_net_cfg_from_file(FLAGS.net_cfg)
@@ -29,8 +43,9 @@ def full_test():
     model = HRNet(FLAGS.net_cfg)
     output = model.forward_eval(images)
     print(output)
+    print(labels)
     loss = model.joints_mse_loss(output, labels)
     print(loss)
 
 if __name__ == '__main__':
-    full_test()
+    quick_test()

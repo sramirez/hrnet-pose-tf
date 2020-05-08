@@ -5,6 +5,7 @@ from utils.misc_utils import is_primary_worker as is_primary_worker_impl
 from utils.multi_gpu_wrapper import MultiGpuWrapper as mgw
 from datasets.ilsvrc12_dataset import Ilsvrc12Dataset
 from net.model import HRNet
+from net.loss import JointsMSELoss
 from trainer.utils import *
 from timeit import default_timer as timer
 import numpy as np
@@ -63,7 +64,7 @@ class Trainer():
                         tf.add_to_collection('logits_final', value)
 
                 # loss & extra evaluation metrics
-                loss, metrics = self.hrnet.calc_loss(labels, logits, self.trainable_vars)
+                loss, metrics = JointsMSELoss()(labels, logits, self.trainable_vars)
 
                 tf.summary.scalar('loss', loss)
                 for key, value in metrics.items():

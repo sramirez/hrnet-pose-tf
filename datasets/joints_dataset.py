@@ -185,7 +185,7 @@ class joints_dataset():
 
         # Go to tensors
         input = tf.convert_to_tensor(input, dtype=tf.float32)
-        target = tf.convert_to_tensor(target, dtype=tf.float32)
+        target = tf.transpose(tf.convert_to_tensor(target, dtype=tf.float32), perm=[1,2,0]) # set number keypoints as the last axis
         target_weight = tf.convert_to_tensor(target_weight, dtype=tf.float32)
 
         meta = {
