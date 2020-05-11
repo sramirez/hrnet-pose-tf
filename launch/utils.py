@@ -4,7 +4,7 @@ import re
 FLAGS = tf.app.flags.FLAGS
 
 
-def setup_lrn_rate_piecewise_constant(global_step, lrn_rate_init, batch_size, idxs_epoch, decay_rates):
+def setup_lrn_rate_piecewise_constant(global_step, lrn_rate_init, batch_size, idxs_epoch, decay_rates, num_images):
     """Setup the learning rate with piecewise constant strategy.
 
     Args:
@@ -25,7 +25,7 @@ def setup_lrn_rate_piecewise_constant(global_step, lrn_rate_init, batch_size, id
 
     # setup learning rate with the piecewise constant strategy
     lrn_rate_init = lrn_rate_init * batch_size / batch_size_norm
-    nb_batches_per_epoch = float(FLAGS.nb_smpls_train) / batch_size
+    nb_batches_per_epoch = float(num_images) / batch_size
     bnds = [int(nb_batches_per_epoch * idx_epoch) for idx_epoch in idxs_epoch]
     vals = [lrn_rate_init * decay_rate for decay_rate in decay_rates]
     lrn_rate = tf.train.piecewise_constant(global_step, bnds, vals)

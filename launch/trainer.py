@@ -23,7 +23,7 @@ class Trainer():
 
         # initialize training & evaluation subsets
         #self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, "../data/coco/",
-        #                                            self.hrnet.cfg['DATASET']['test_set'], False) # we don't have COCO train downloaded
+        #                                            self.hrnet.cfg['DATASET']['test_set'], True) # we don't have COCO train downloaded
         self.dataset_eval = coco_keypoints_dataset(self.hrnet.cfg, "../data/coco/",
                                                    self.hrnet.cfg['DATASET']['test_set'], False)
 
@@ -64,7 +64,6 @@ class Trainer():
 
                 # loss & extra evaluation metrics
                 loss, metrics = JointsMSELoss()(logits, labels)
-
                 tf.summary.scalar('loss', loss)
                 for key, value in metrics.items():
                     tf.summary.scalar(key, value)
@@ -79,7 +78,6 @@ class Trainer():
                     grads = optimizer.compute_gradients(loss, self.trainable_vars)
 
             # TF operations & model saver
-            print(self.vars)
             if is_train:
                 self.sess_train = sess
                 with tf.control_dependencies(self.update_ops):
@@ -100,6 +98,7 @@ class Trainer():
                 vars_to_restore = self.vars if self.hrnet.cfg['HEAD']['load_weights'] \
                     else [x for x in self.vars if 'HEAD' not in x.name]
                 self.saver_eval = tf.train.Saver(vars_to_restore)
+            print("Graph build finished.")
 
     def train(self):
         """Train a model and periodically produce checkpoint files."""
@@ -145,9 +144,9 @@ class Trainer():
     def eval(self):
         ckpt_path = self.__restore_model(self.saver_eval, self.sess_eval)
         tf.logging.info('restore from %s' % (ckpt_path))
-
+        print("Starting evaluation process")
         # eval
-        nb_iters = int(np.ceil(float(FLAGS.nb_smpls_eval) / FLAGS.batch_size_eval))
+        nb_iters = int(np.ceil(float(self.dataset_eval.num_images) / FLAGS.batch_size_eval))
         eval_rslts = np.zeros((nb_iters, len(self.eval_op)))
 
         for idx_iter in range(nb_iters):
@@ -169,8 +168,9 @@ class Trainer():
         decay_rates = [1.0, 0.1, 0.01, 0.001]
         nb_epochs_rat = 1.0
         batch_size = FLAGS.batch_size * (1 if not FLAGS.enbl_multi_gpu else mgw.size())
-        lrn_rate = setup_lrn_rate_piecewise_constant(global_step, self.lr_init, batch_size, idxs_epoch, decay_rates)
-        nb_iters = int(FLAGS.nb_smpls_train * nb_epochs * nb_epochs_rat / batch_size)
+        lrn_rate = setup_lrn_rate_piecewise_constant(global_step, self.lr_init, batch_size,
+                                                     idxs_epoch, decay_rates, self.dataset_train.num_images)
+        nb_iters = int(self.dataset_train.num_images * nb_epochs * nb_epochs_rat / batch_size)
 
         return lrn_rate, nb_iters
 

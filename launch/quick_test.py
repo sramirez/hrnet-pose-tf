@@ -51,4 +51,4 @@ def full_test():
             print(real_loss)
 
 if __name__ == '__main__':
-    quick_test()
+    full_test()

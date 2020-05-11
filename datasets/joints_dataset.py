@@ -50,7 +50,7 @@ class joints_dataset():
 
         self.target_type = cfg['MODEL']['target_type']
         self.image_size = np.array(cfg['MODEL']['image_size'])
-        self.heatmap_size = np.array((cfg['MODEL']['heatmap_size']))
+        self.heatmap_size = np.array([cfg['MODEL']['image_size'][0] // 4, cfg['MODEL']['image_size'][1] // 4])
         self.sigma = cfg['MODEL']['sigma']
         self.use_different_joints_weight = cfg['LOSS']['use_different_joints_weight']
         self.joints_weight = 1

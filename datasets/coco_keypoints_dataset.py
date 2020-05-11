@@ -109,7 +109,7 @@ class coco_keypoints_dataset(joints_dataset):
         # Pre-process and load all images
         self.db = self._get_db()
 
-        if is_train and cfg.DATASET.SELECT_DATA:
+        if is_train and cfg['DATASET']['select_data']:
             self.db = self.select_data(self.db)
 
         logger.info('=> load {} samples'.format(len(self.db)))
