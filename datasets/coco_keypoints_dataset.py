@@ -25,17 +25,6 @@ from nms.nms import soft_oks_nms
 
 logger = logging.getLogger(__name__)
 
-FLAGS = tf.app.flags.FLAGS
-
-tf.app.flags.DEFINE_integer('batch_size', 32, 'batch size per GPU for training')
-tf.app.flags.DEFINE_integer('buffer_size', 1024, '# of elements to be buffered when prefetching')
-tf.app.flags.DEFINE_integer('prefetch_size', 8, '# of mini-batches to be buffered when prefetching')
-#tf.app.flags.DEFINE_integer('nb_smpls_train', 1281167, '# of samples for training') # TODO: check why this is needed
-tf.app.flags.DEFINE_integer('nb_smpls_val', 10000, '# of samples for validation')
-#tf.app.flags.DEFINE_integer('nb_smpls_eval', 50000, '# of samples for evaluation')
-tf.app.flags.DEFINE_integer('batch_size_eval', 32, 'batch size for evaluation')
-
-
 
 class coco_keypoints_dataset(joints_dataset):
     '''
@@ -64,6 +53,7 @@ class coco_keypoints_dataset(joints_dataset):
     '''
     def __init__(self, cfg, root, image_set, is_train, transform=None):
         super().__init__(cfg, root, image_set, is_train, transform)
+        self.cfg = cfg
         self.bbox_file = cfg['DATASET']['coco_bbox_file']
         self.nms_thre = cfg['POST']['nms_thre']
         self.image_thre = cfg['POST']['image_thre']
@@ -75,7 +65,7 @@ class coco_keypoints_dataset(joints_dataset):
         self.image_height = cfg['MODEL']['image_size'][1]
         self.aspect_ratio = self.image_width * 1.0 / self.image_height
         self.pixel_std = 200
-        self.batch_size = FLAGS.batch_size
+        self.batch_size = cfg['COMMON']['batch_size']
 
         self.coco = COCO(self._get_ann_file_keypoint())
 
@@ -131,9 +121,9 @@ class coco_keypoints_dataset(joints_dataset):
             labels.append(target)
             i += 1
         dataset = tf.data.Dataset.from_tensor_slices((images, labels))
-        dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(buffer_size=FLAGS.buffer_size))
+        dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(buffer_size=self.cfg['COMMON']['buffer_size']))
         dataset = dataset.batch(self.batch_size)
-        dataset = dataset.prefetch(FLAGS.prefetch_size)
+        dataset = dataset.prefetch(self.cfg['COMMON']['prefetch_size'])
         iterator = dataset.make_one_shot_iterator()
 
         return iterator

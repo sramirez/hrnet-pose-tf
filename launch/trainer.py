@@ -9,12 +9,11 @@ from timeit import default_timer as timer
 import numpy as np
 import os
 
-FLAGS = tf.app.flags.FLAGS
-
+FLAGS = tf.app.flags.FLAGS # args coming from main method
 
 class Trainer():
 
-    def __init__(self, data_path, netcfg):
+    def __init__(self, netcfg):
         self.data_scope = 'DATA'
         self.model_scope = 'HRNET'
 
@@ -22,10 +21,10 @@ class Trainer():
         self.hrnet = HRNet(netcfg)
 
         # initialize training & evaluation subsets
-        #self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, "../data/coco/",
-        #                                            self.hrnet.cfg['DATASET']['test_set'], True) # we don't have COCO train downloaded
-        self.dataset_eval = coco_keypoints_dataset(self.hrnet.cfg, "../data/coco/",
-                                                   self.hrnet.cfg['DATASET']['test_set'], False)
+        self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
+                                                    self.hrnet.cfg['DATASET']['test_set'], True) # we don't have COCO train downloaded
+        #self.dataset_eval = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
+        #                                           self.hrnet.cfg['DATASET']['test_set'], False)
 
         # learning rate
         self.lr_init = self.hrnet.cfg['COMMON']['lr_rate_init']
@@ -146,7 +145,7 @@ class Trainer():
         tf.logging.info('restore from %s' % (ckpt_path))
         print("Starting evaluation process")
         # eval
-        nb_iters = int(np.ceil(float(self.dataset_eval.num_images) / FLAGS.batch_size_eval))
+        nb_iters = int(np.ceil(float(self.dataset_eval.num_images) / self.cfg['COMMON']['batch_size_eval']))
         eval_rslts = np.zeros((nb_iters, len(self.eval_op)))
 
         for idx_iter in range(nb_iters):

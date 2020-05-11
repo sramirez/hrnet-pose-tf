@@ -6,7 +6,6 @@ from net.head import PoseHead
 from net.stage import HRStage
 from net.front import HRFront
 from collections import Counter
-from netutils.config import load_net_cfg_from_file
 import functools
 
 from tensorflow.python.ops.init_ops import VarianceScaling
@@ -26,9 +25,9 @@ def he_normal_fanout(seed=None):
 
 class HRNet():
 
-    def __init__(self, cfgfile):
+    def __init__(self, cfg):
         self.stages = []
-        self._load_cfg(cfgfile)
+        self.cfg = cfg
         self._build_components()
 
     def forward_train(self, train_input):
@@ -104,9 +103,6 @@ class HRNet():
             _out = stage.forward(_out)
 
         return _out
-
-    def _load_cfg(self, cfgfile):
-        self.cfg = load_net_cfg_from_file(cfgfile)
 
     def _get_num_parameters(self):
         vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
