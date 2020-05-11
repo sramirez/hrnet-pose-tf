@@ -37,7 +37,7 @@ def quick_test():
 
 def full_test():
     cfg = config.load_net_cfg_from_file(FLAGS.net_cfg)
-    coco = coco_keypoints_dataset(cfg, "../data/coco/", cfg['DATASET']['test_set'], False)
+    coco = coco_keypoints_dataset(cfg, "../data/coco/", FLAGS.test_path, False)
     inputs = coco.build(subset=10)
     images, labels = inputs.get_next()
     model = HRNet(FLAGS.net_cfg)

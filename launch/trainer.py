@@ -22,9 +22,9 @@ class Trainer():
 
         # initialize training & evaluation subsets
         self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
-                                                    self.hrnet.cfg['DATASET']['test_set'], True) # we don't have COCO train downloaded
-        #self.dataset_eval = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
-        #                                           self.hrnet.cfg['DATASET']['test_set'], False)
+                                                    FLAGS.test_path, True) # TODO: change test_path by test_path
+        self.dataset_eval = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
+                                                   FLAGS.test_path, False)
 
         # learning rate
         self.lr_init = self.hrnet.cfg['COMMON']['lr_rate_init']
@@ -44,7 +44,7 @@ class Trainer():
 
             # data input pipeline
             with tf.variable_scope(self.data_scope):
-                iterator = self.dataset_train.build(subset=10) if is_train else self.dataset_eval.build(subset=10) # TODO: remove subsetting
+                iterator = self.dataset_train.build(10) if is_train else self.dataset_eval.build(10)
                 images, labels = iterator.get_next()
                 if not isinstance(images, dict):
                     tf.add_to_collection('images_final', images)
@@ -78,10 +78,9 @@ class Trainer():
 
             # TF operations & model saver
             if is_train:
-                self.sess_train = sess
+                self.sess = sess
                 with tf.control_dependencies(self.update_ops):
                     self.train_op = optimizer.apply_gradients(grads, global_step=self.global_step)
-
                 self.summary_op = tf.summary.merge_all()
                 self.sm_writer = tf.summary.FileWriter(logdir=self.log_path)
                 self.log_op = [lrn_rate, loss] + list(metrics.values())
@@ -89,38 +88,33 @@ class Trainer():
                 self.init_op = tf.variables_initializer(self.vars)
                 if FLAGS.enbl_multi_gpu:
                     self.bcast_op = mgw.broadcast_global_variables(0)
-                self.saver_train = tf.train.Saver(self.vars)
-            else:
-                self.sess_eval = sess
-                self.eval_op = [loss] + list(metrics.values())
-                self.eval_op_names = ['loss'] + list(metrics.keys())
-                vars_to_restore = self.vars if self.hrnet.cfg['HEAD']['load_weights'] \
-                    else [x for x in self.vars if 'HEAD' not in x.name]
-                self.saver_eval = tf.train.Saver(vars_to_restore)
+                self.saver = self._create_saver()
+            self.eval_op = [loss] + list(metrics.values())
+            self.eval_op_names = ['loss'] + list(metrics.keys())
             print("Graph build finished.")
 
     def train(self):
         """Train a model and periodically produce checkpoint files."""
 
         # initialization
-        self.sess_train.run(self.init_op)
+        self.sess.run(self.init_op)
 
         if FLAGS.resume_training:
             save_path = tf.train.latest_checkpoint(os.path.dirname(self.model_path + '/model.ckpt'))
-            self.saver_train.restore(self.sess_train, save_path)
+            self.saver.restore(self.sess, save_path)
             self.nb_iters_start = get_global_step_from_ckpt(save_path)
 
         if FLAGS.enbl_multi_gpu:
-            self.sess_train.run(self.bcast_op)
+            self.sess.run(self.bcast_op)
 
         # train the model through iterations and periodically save & evaluate the model
         time_prev = timer()
         for idx_iter in range(self.nb_iters_start, self.nb_iters_train):
             # train the model
             if (idx_iter + 1) % self.summ_step != 0:
-                self.sess_train.run(self.train_op)
+                self.sess.run(self.train_op)
             else:
-                __, summary, log_rslt = self.sess_train.run([self.train_op, self.summary_op, self.log_op])
+                __, summary, log_rslt = self.sess.run([self.train_op, self.summary_op, self.log_op])
                 if self.is_primary_worker('global'):
                     time_step = timer() - time_prev
                     self.__monitor_progress(summary, self.summ_step, log_rslt, idx_iter, time_step)
@@ -129,27 +123,27 @@ class Trainer():
             # save and eval the model at certain steps
             if self.is_primary_worker('global') and (idx_iter + 1) % self.save_step == 0:
                 # save model
-                self.saver_train.save(self.sess_train, os.path.join(self.model_path, 'model.ckpt'),
+                self.saver.save(self.sess, os.path.join(self.model_path, 'model.ckpt'),
                                       global_step=self.global_step)
                 self.eval()
 
         # save the final model
         if self.is_primary_worker('global'):
             # save model
-            self.saver_train.save(self.sess_train, os.path.join(self.model_path, 'model.ckpt'),
+            self.saver.save(self.sess, os.path.join(self.model_path, 'model.ckpt'),
                                   global_step=self.global_step)
             self.eval()
 
     def eval(self):
-        ckpt_path = self.__restore_model(self.saver_eval, self.sess_eval)
+        ckpt_path = self.__restore_model(self.saver, self.sess)
         tf.logging.info('restore from %s' % (ckpt_path))
         print("Starting evaluation process")
         # eval
-        nb_iters = int(np.ceil(float(self.dataset_eval.num_images) / self.cfg['COMMON']['batch_size_eval']))
+        nb_iters = int(np.ceil(float(self.dataset_eval.num_images) / FLAGS.batch_size))
         eval_rslts = np.zeros((nb_iters, len(self.eval_op)))
 
         for idx_iter in range(nb_iters):
-            eval_rslts[idx_iter] = self.sess_eval.run(self.eval_op)
+            eval_rslts[idx_iter] = self.sess.run(self.eval_op)
 
         for idx, name in enumerate(self.eval_op_names):
             tf.logging.info('%s = %.4e' % (name, np.mean(eval_rslts[:, idx])))
@@ -223,9 +217,19 @@ class Trainer():
     @property
     def trainable_vars(self):
         """List of all trainable variables."""
-        return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.model_scope)
+        trainable = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.model_scope)
+        if FLAGS.fine_tune:
+            trainable = [x for x in trainable if 'HEAD' in x.name]
+        return trainable
 
     @property
     def update_ops(self):
         """List of all update operations."""
         return tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope=self.model_scope)
+
+    def _create_saver(self):
+        vars_to_restore = self.vars if self.hrnet.cfg['HEAD']['load_weights'] \
+            else [x for x in self.vars if 'HEAD' not in x.name]
+        return tf.train.Saver(vars_to_restore)
+
+

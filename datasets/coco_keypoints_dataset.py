@@ -26,6 +26,8 @@ from nms.nms import soft_oks_nms
 logger = logging.getLogger(__name__)
 
 
+FLAGS = tf.app.flags.FLAGS
+
 class coco_keypoints_dataset(joints_dataset):
     '''
     "keypoints": {
@@ -54,7 +56,7 @@ class coco_keypoints_dataset(joints_dataset):
     def __init__(self, cfg, root, image_set, is_train, transform=None):
         super().__init__(cfg, root, image_set, is_train, transform)
         self.cfg = cfg
-        self.bbox_file = cfg['DATASET']['coco_bbox_file']
+        self.bbox_file = os.path.join(root, FLAGS.bbox_file)
         self.nms_thre = cfg['POST']['nms_thre']
         self.image_thre = cfg['POST']['image_thre']
         self.soft_nms = cfg['POST']['soft_nms']
@@ -65,7 +67,7 @@ class coco_keypoints_dataset(joints_dataset):
         self.image_height = cfg['MODEL']['image_size'][1]
         self.aspect_ratio = self.image_width * 1.0 / self.image_height
         self.pixel_std = 200
-        self.batch_size = cfg['COMMON']['batch_size']
+        self.batch_size = FLAGS.batch_size
 
         self.coco = COCO(self._get_ann_file_keypoint())
 

@@ -54,7 +54,6 @@ class HRNet():
 
         with slim.arg_scope([layers.batch_norm], **batch_norm_params):
             with slim.arg_scope([slim.conv2d],
-                                weights_initializer=he_normal_fanout(), # TODO: check if it is correct
                                 weights_regularizer=slim.l2_regularizer(self.cfg['NET']['weight_l2_scale'])):
                 final_output = self._forward(eval_input)
 
