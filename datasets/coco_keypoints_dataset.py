@@ -56,7 +56,7 @@ class coco_keypoints_dataset(joints_dataset):
     def __init__(self, cfg, root, image_set, is_train, transform=None):
         super().__init__(cfg, root, image_set, is_train, transform)
         self.cfg = cfg
-        self.bbox_file = os.path.join(root, FLAGS.bbox_file)
+        self.bbox_file = FLAGS.bbox_file
         self.nms_thre = cfg['POST']['nms_thre']
         self.image_thre = cfg['POST']['image_thre']
         self.soft_nms = cfg['POST']['soft_nms']
@@ -275,7 +275,6 @@ class coco_keypoints_dataset(joints_dataset):
 
         kpt_db = []
         num_boxes = 0
-        cnt = 0
         for det_res in all_boxes:
             if det_res['category_id'] != 1:
                 continue
