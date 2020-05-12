@@ -101,7 +101,13 @@ class Trainer():
         self.sess_train.run(self.init_op)
         if FLAGS.resume_training:
             save_path = tf.train.latest_checkpoint(os.path.dirname(self.model_path + '/model.ckpt'))
-            self.saver_train.restore(self.sess_train, save_path)
+            if FLAGS.fine_tune:
+                # check if saver will restore only some layers
+                self.saver_train = self._create_saver(only_head=True)
+                self.saver_train.restore(self.sess_train, save_path)
+                self.saver_train = self._create_saver(only_head=False) # then we should allow saving all layers
+            else:
+                self.saver_train.restore(self.sess_train, save_path)
             self.nb_iters_start = get_global_step_from_ckpt(save_path)
 
         if FLAGS.enbl_multi_gpu:
@@ -219,9 +225,8 @@ class Trainer():
         """List of all update operations."""
         return tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope=self.model_scope)
 
-    def _create_saver(self):
-        vars_to_restore = self.vars if self.hrnet.cfg['HEAD']['load_weights'] \
-            else [x for x in self.vars if 'HEAD' not in x.name]
+    def _create_saver(self, only_head=False):
+        vars_to_restore = [x for x in self.vars if 'HEAD' not in x.name] if only_head else self.vars
         return tf.train.Saver(vars_to_restore)
 
     def _save_and_eval(self, saver, sess):
