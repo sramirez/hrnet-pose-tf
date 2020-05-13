@@ -20,11 +20,34 @@ from netutils.transforms import get_affine_transform
 from netutils.transforms import affine_transform
 from netutils.transforms import fliplr_joints
 
+from collections import defaultdict
+from collections import OrderedDict
+import os
+from nms.nms import oks_nms
+from nms.nms import soft_oks_nms
+
 
 logger = logging.getLogger(__name__)
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
 
+''' 
+Each call to __getitem__ will return the following information:
+image,
+label,
+meta =
+{
+    'image': image_file,
+    'filename': filename,
+    'imgnum': imgnum,
+    'joints': joints,
+    'joints_vis': joints_vis,
+    'center': c,
+    'scale': s,
+    'rotation': r,
+    'score': score
+} 
+'''
 class joints_dataset():
     def __init__(self, cfg, root, image_set, is_train, transform=None, normalize=True):
         self.num_joints = 0
@@ -59,9 +82,6 @@ class joints_dataset():
         self.db = []
 
     def _get_db(self):
-        raise NotImplementedError
-
-    def evaluate(self, cfg, preds, output_dir, *args, **kwargs):
         raise NotImplementedError
 
     def half_body_transform(self, joints, joints_vis):
@@ -292,3 +312,62 @@ class joints_dataset():
             target_weight = np.multiply(target_weight, self.joints_weight)
 
         return target, target_weight
+
+    def evaluate(self, preds, output_dir, all_boxes, img_path):
+        res_folder = os.path.join(output_dir, 'results')
+        if not os.path.exists(res_folder):
+            try:
+                os.makedirs(res_folder)
+            except Exception:
+                logger.error('Fail to make {}'.format(res_folder))
+
+        # person x (keypoints)
+        _kpts = []
+        for idx, kpt in enumerate(preds):
+            _kpts.append({
+                'keypoints': kpt,
+                'center': all_boxes[idx][0:2],
+                'scale': all_boxes[idx][2:4],
+                'area': all_boxes[idx][4],
+                'score': all_boxes[idx][5],
+                'image': int(img_path[idx][-16:-4])
+            })
+        # image x person x (keypoints)
+        kpts = defaultdict(list)
+        for kpt in _kpts:
+            kpts[kpt['image']].append(kpt)
+
+        # rescoring and oks nms
+        num_joints = self.num_joints
+        in_vis_thre = self.in_vis_thre
+        oks_thre = self.oks_thre
+        oks_nmsed_kpts = []
+        for img in kpts.keys():
+            img_kpts = kpts[img]
+            for n_p in img_kpts:
+                box_score = n_p['score']
+                kpt_score = 0
+                valid_num = 0
+                for n_jt in range(0, num_joints):
+                    t_s = n_p['keypoints'][n_jt][2]
+                    if t_s > in_vis_thre:
+                        kpt_score = kpt_score + t_s
+                        valid_num = valid_num + 1
+                if valid_num != 0:
+                    kpt_score = kpt_score / valid_num
+                # rescoring
+                n_p['score'] = kpt_score * box_score
+
+            if self.soft_nms:
+                keep = soft_oks_nms(
+                    [img_kpts[i] for i in range(len(img_kpts))],
+                    oks_thre
+                )
+            else:
+                keep = oks_nms(
+                    [img_kpts[i] for i in range(len(img_kpts))],
+                    oks_thre
+                )
+            oks_nmsed_kpts.append(img_kpts if len(keep) == 0 else [img_kpts[_keep] for _keep in keep])
+        return oks_nmsed_kpts
+

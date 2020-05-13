@@ -4,7 +4,9 @@ from netutils.multi_gpu_wrapper import MultiGpuWrapper as mgw
 from net.model import HRNet
 from net.loss import JointsMSELoss
 from datasets.coco_keypoints_dataset import coco_keypoints_dataset
+
 from launch.utils import *
+from core.function import validate
 from timeit import default_timer as timer
 import numpy as np
 import os
@@ -19,8 +21,8 @@ class Trainer():
         # initialize network
         self.hrnet = HRNet(netcfg)
         # initialize training & evaluation subsets
-        self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
-                                                    FLAGS.test_path, True) # TODO: change test_path by test_path
+        #self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
+        #                                            FLAGS.test_path, True) # TODO: change test_path by test_path
         self.dataset_eval = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
                                                    FLAGS.test_path, False)
 
@@ -35,15 +37,17 @@ class Trainer():
     def build_graph(self, is_train):
         with tf.Graph().as_default():
             # TensorFlow session
-            config = tf.ConfigProto()
+            config = tf.ConfigProto( # TODO: remove before launching on server
+                device_count = {'GPU': 0}
+            )
             config.gpu_options.visible_device_list = str(
                 mgw.local_rank() if FLAGS.enbl_multi_gpu else 0)  # pylint: disable=no-member
             sess = tf.Session(config=config)
 
             # data input pipeline
             with tf.variable_scope(self.data_scope):
-                iterator = self.dataset_train.build() if is_train else self.dataset_eval.build() # TODO: revise subsetting
-                images, labels = iterator.get_next()
+                iterator = self.dataset_train.build(10) if is_train else self.dataset_eval.build(10) # TODO: revise subsetting
+                images, labels, metas = iterator.get_next()
                 if not isinstance(images, dict):
                     tf.add_to_collection('images_final', images)
                 else:
@@ -78,7 +82,8 @@ class Trainer():
             if is_train:
                 self.sess_train = sess
                 with tf.control_dependencies(self.update_ops):
-                    self.train_op = optimizer.apply_gradients(grads, global_step=self.global_step)
+                    steps = optimizer.apply_gradients(grads, global_step=self.global_step)
+                    self.train_op = steps
                 self.summary_op = tf.summary.merge_all()
                 self.sm_writer = tf.summary.FileWriter(logdir=self.log_path)
                 self.log_op = [lrn_rate, loss] + list(metrics.values())
@@ -89,8 +94,8 @@ class Trainer():
                 self.saver_train = self._create_saver()
             else:
                 self.sess_eval = sess
-                self.eval_op = [loss] + list(metrics.values())
-                self.eval_op_names = ['loss'] + list(metrics.keys())
+                self.eval_op = [loss, logits, labels, metas] + list(metrics.values())
+                self.eval_op_names = ['loss', 'logits', 'metas'] + list(metrics.keys())
                 self.saver_eval = self._create_saver()
             print("Graph build finished.")
 
@@ -116,6 +121,7 @@ class Trainer():
         # train the model through iterations and periodically save & evaluate the model
         # one iteration corresponds with a single batch run (# epochs * # batches)
         time_prev = timer()
+        last_performance = 0.0
         for idx_iter in range(self.nb_iters_start, self.nb_iters_train):
             # train the model
             if (idx_iter + 1) % self.summ_step != 0:
@@ -130,7 +136,8 @@ class Trainer():
             # save and eval the model at certain steps (at the last iteration too)
             if self.is_primary_worker('global') and \
                     (((idx_iter + 1) % self.save_step == 0) or (idx_iter + 1 == self.nb_iters_train)):
-                self._save_and_eval(saver=self.saver_train, sess=self.sess_train)
+                last_performance = self._save_and_eval(saver=self.saver_train,
+                                                       sess=self.sess_train, last_performance=last_performance)
 
     def eval(self):
         ckpt_path = self.__restore_model(self.saver_eval, self.sess_eval)
@@ -141,10 +148,15 @@ class Trainer():
         eval_rslts = np.zeros((nb_iters, len(self.eval_op)))
 
         for idx_iter in range(nb_iters):
-            eval_rslts[idx_iter] = self.sess_eval.run(self.eval_op)
+            eval_rslts[idx_iter], logits, labels, metas = self.sess_eval.run(self.eval_op)
+
+        perf_indicator = validate(self.cfg, self.dataset_eval, outputs=logits, targets=labels, metas=metas,
+                                  output_dir=self.log_path, writer_dict=None)
 
         for idx, name in enumerate(self.eval_op_names):
             tf.logging.info('%s = %.4e' % (name, np.mean(eval_rslts[:, idx])))
+
+        return perf_indicator
 
     def __restore_model(self, saver, session):
         ckpt_path = tf.train.latest_checkpoint(self.model_path)
@@ -229,9 +241,11 @@ class Trainer():
         vars_to_restore = [x for x in self.vars if 'HEAD' not in x.name] if only_head else self.vars
         return tf.train.Saver(vars_to_restore)
 
-    def _save_and_eval(self, saver, sess):
-        # save model
-        saver.save(sess, os.path.join(self.model_path, 'model.ckpt'),
-                              global_step=self.global_step)
-        self.eval()
+    def _save_and_eval(self, saver, sess, last_performance):
+        perf_indicator = self.eval()
+        if last_performance <= perf_indicator: # only save better models
+            # save model
+            saver.save(sess, os.path.join(self.model_path, 'model.ckpt'),
+                                  global_step=self.global_step)
+        return perf_indicator
 
