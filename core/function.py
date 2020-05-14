@@ -22,7 +22,7 @@ from datasets.joints_dataset import joints_dataset
 logger = logging.getLogger(__name__)
 
 # TODO: do validation with flip
-def validate(config, dataset, outputs, targets, metas, output_dir, writer_dict=None):
+def validate(config, dataset, outputs, targets, ids, output_dir, writer_dict=None):
     losses = AverageMeter()
     acc = AverageMeter()
     num_samples = dataset.num_images
@@ -33,9 +33,10 @@ def validate(config, dataset, outputs, targets, metas, output_dir, writer_dict=N
     all_boxes = np.zeros((num_samples, 6))
     image_path = []
     idx = 0
-    for i, (output, target, meta) in enumerate(zip(outputs, targets, metas)):
+    for i, (output, target, id) in enumerate(zip(outputs, targets, ids)):
 
         num_images = output.size(0)
+        meta = dataset.augmented_db[str(id)]
         # measure accuracy and record loss
         _, avg_acc, cnt, pred = accuracy(output,
                                          target)

@@ -46,8 +46,8 @@ class Trainer():
 
             # data input pipeline
             with tf.variable_scope(self.data_scope):
-                iterator = self.dataset_train.build(10) if is_train else self.dataset_eval.build(10) # TODO: revise subsetting
-                images, labels, metas = iterator.get_next()
+                iterator = self.dataset_train.build() if is_train else self.dataset_eval.build()
+                images, labels, ids = iterator.get_next()
                 if not isinstance(images, dict):
                     tf.add_to_collection('images_final', images)
                 else:
@@ -94,8 +94,8 @@ class Trainer():
                 self.saver_train = self._create_saver()
             else:
                 self.sess_eval = sess
-                self.eval_op = [loss, logits, labels, metas] + list(metrics.values())
-                self.eval_op_names = ['loss', 'logits', 'metas'] + list(metrics.keys())
+                self.eval_op = [logits, labels, ids, loss]
+                self.eval_op_names = ['logits', 'labels', 'ids', 'loss']
                 self.saver_eval = self._create_saver()
             print("Graph build finished.")
 
@@ -144,13 +144,15 @@ class Trainer():
         tf.logging.info('restore from %s' % (ckpt_path))
         print("Starting evaluation process")
         # eval
-        nb_iters = int(np.ceil(float(self.dataset_eval.num_images) / FLAGS.batch_size))
-        eval_rslts = np.zeros((nb_iters, len(self.eval_op)))
+        #nb_iters = int(np.ceil(float(self.dataset_eval.num_images) / FLAGS.batch_size)) # TODO: set old value
+        nb_iters = 3
+        eval_rslts = np.zeros((nb_iters, 1))
 
         for idx_iter in range(nb_iters):
-            eval_rslts[idx_iter], logits, labels, metas = self.sess_eval.run(self.eval_op)
+            logits, labels, ids, loss = self.sess_eval.run(self.eval_op) # TODO: logits and labels only return a single instance, batch size: 2
+            eval_rslts[idx_iter] = loss
 
-        perf_indicator = validate(self.cfg, self.dataset_eval, outputs=logits, targets=labels, metas=metas,
+        perf_indicator = validate(self.hrnet.cfg, self.dataset_eval, outputs=logits, targets=labels, ids=ids,
                                   output_dir=self.log_path, writer_dict=None)
 
         for idx, name in enumerate(self.eval_op_names):

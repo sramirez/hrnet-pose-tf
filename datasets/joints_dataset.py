@@ -80,6 +80,7 @@ class joints_dataset():
 
         self.transform = transform
         self.db = []
+        self.augmented_db = {}
 
     def _get_db(self):
         raise NotImplementedError
@@ -204,9 +205,9 @@ class joints_dataset():
         target, target_weight = self.generate_target(joints, joints_vis)
 
         # Go to tensors
-        input = tf.convert_to_tensor(input, dtype=tf.float32)
-        target = tf.transpose(tf.convert_to_tensor(target, dtype=tf.float32), perm=[1,2,0]) # set number keypoints as the last axis
-        target_weight = tf.convert_to_tensor(target_weight, dtype=tf.float32)
+        #input = tf.convert_to_tensor(input, dtype=tf.float32)
+        target = target.transpose(1,2,0) # set number keypoints as the last axis
+        #target_weight = tf.convert_to_tensor(target_weight, dtype=tf.float32)
 
         meta = {
             'image': image_file,
@@ -219,6 +220,7 @@ class joints_dataset():
             'rotation': r,
             'score': score
         }
+        self.augmented_db[str(idx)] = meta
 
         return input, target, target_weight, meta
 

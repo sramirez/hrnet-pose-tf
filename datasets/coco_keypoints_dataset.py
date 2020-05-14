@@ -122,26 +122,30 @@ class coco_keypoints_dataset(joints_dataset):
 
         logger.info('=> load {} samples'.format(len(self.db)))
 
-    def build(self, subset=10e10):
+    def db_generator(self):
+        for (i, (input, target, _, _)) in enumerate(self):
+            yield input, target, i
+
+    def db_generator_subset(self):
+        size = max(1, min(10, len(self.db))) # TODO: change subsetting = 10
+        print("Size: " + str(size))
+        i = 0
+        while i < size:
+            input, target, _, meta = self[i]
+            i += 1
+            print(i - 1)
+            yield input, target, i - 1
+
+    def build(self):
         """Make an iterator from self.db
 
         Returns:
         * iterator: iterator for the already initialized dataset
         """
-        size = max(1, min(subset, len(self.db)))
-        print("Size: " + str(size))
-        i = 0
-        images = []
-        labels = []
-        metas = []
-        while i < size:
-            input, target, _, meta = self[i]
-            images.append(input)
-            labels.append(target)
-            metas.append(meta)
-            i += 1
-        dataset = tf.data.Dataset.from_tensor_slices((images, labels, metas))
-        dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(buffer_size=self.cfg['COMMON']['buffer_size']))
+        input, target, _, meta = self[0]
+        shapes = (np.shape(input), np.shape(target), ())
+        dataset = tf.data.Dataset.from_generator(self.db_generator, (tf.float32, tf.float32, tf.uint8), output_shapes=shapes)
+        dataset = dataset.shuffle(buffer_size=10).repeat() # TODO: set old buffer_size = self.cfg['COMMON']['buffer_size']
         dataset = dataset.batch(self.batch_size)
         dataset = dataset.prefetch(self.cfg['COMMON']['prefetch_size'])
         iterator = dataset.make_one_shot_iterator()
