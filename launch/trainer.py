@@ -21,8 +21,8 @@ class Trainer():
         # initialize network
         self.hrnet = HRNet(netcfg)
         # initialize training & evaluation subsets
-        #self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
-        #                                            FLAGS.train_path, True) # TODO: uncomment and change test_path by test_path
+        self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
+                                                    FLAGS.train_path, True)
         self.dataset_eval = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
                                                    FLAGS.test_path, False)
 
@@ -89,6 +89,7 @@ class Trainer():
                 self.init_op = tf.variables_initializer(self.vars)
                 if FLAGS.enbl_multi_gpu:
                     self.bcast_op = mgw.broadcast_global_variables(0)
+                self.saver_train_wo_head = self._create_saver(discard_head=True)
                 self.saver_train = self._create_saver()
             else:
                 self.sess_eval = sess
@@ -104,13 +105,11 @@ class Trainer():
         self.sess_train.run(self.init_op)
         if FLAGS.resume_training:
             save_path = tf.train.latest_checkpoint(os.path.dirname(self.model_path + '/model.ckpt'))
-            if FLAGS.fine_tune:
+            if FLAGS.load_head_weights:
                 # check if saver will restore only some layers
-                self.saver_train = self._create_saver(only_head=True)
                 self.saver_train.restore(self.sess_train, save_path)
-                self.saver_train = self._create_saver(only_head=False) # then we should allow saving all layers
             else:
-                self.saver_train.restore(self.sess_train, save_path)
+                self.saver_train_wo_head.restore(self.sess_train, save_path) # restore only weights from other layers except head.
             self.nb_iters_start = get_global_step_from_ckpt(save_path)
 
         if FLAGS.enbl_multi_gpu:
@@ -119,7 +118,6 @@ class Trainer():
         # train the model through iterations and periodically save & evaluate the model
         # one iteration corresponds with a single batch run (# epochs * # batches)
         time_prev = timer()
-        last_performance = 0.0
         for idx_iter in range(self.nb_iters_start, self.nb_iters_train):
             # train the model
             if (idx_iter + 1) % self.summ_step != 0:
@@ -135,7 +133,7 @@ class Trainer():
             if self.is_primary_worker('global') and \
                     (((idx_iter + 1) % self.save_step == 0) or (idx_iter + 1 == self.nb_iters_train)):
                 last_performance = self._save_and_eval(saver=self.saver_train,
-                                                       sess=self.sess_train, last_performance=last_performance)
+                                                       sess=self.sess_train)
 
     def eval(self): # TODO: Pass writer_dict for tensorboard when training
         ckpt_path = self.__restore_model(self.saver_eval, self.sess_eval)
@@ -235,7 +233,7 @@ class Trainer():
     def trainable_vars(self):
         """List of all trainable variables."""
         trainable = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.model_scope)
-        if FLAGS.fine_tune:
+        if FLAGS.freeze_first:
             trainable = [x for x in trainable if 'HEAD' in x.name]
         return trainable
 
@@ -244,15 +242,13 @@ class Trainer():
         """List of all update operations."""
         return tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope=self.model_scope)
 
-    def _create_saver(self, only_head=False):
-        vars_to_restore = [x for x in self.vars if 'HEAD' not in x.name] if only_head else self.vars
+    def _create_saver(self, discard_head=False):
+        vars_to_restore = [x for x in self.vars if 'HEAD' not in x.name] if discard_head else self.vars
         return tf.train.Saver(vars_to_restore)
 
-    def _save_and_eval(self, saver, sess, last_performance):
-        perf_indicator = self.eval()
-        if last_performance <= perf_indicator: # only save better models
-            # save model
-            saver.save(sess, os.path.join(self.model_path, 'model.ckpt'),
+    def _save_and_eval(self, saver, sess): # TODO: save only if performance is better than before
+        saver.save(sess, os.path.join(self.model_path, 'model.ckpt'), # First save and then evaluate because it reads model checkpoint before evaluating
                                   global_step=self.global_step)
+        perf_indicator = self.eval()
         return perf_indicator
 
