@@ -137,7 +137,7 @@ class Trainer():
                 last_performance = self._save_and_eval(saver=self.saver_train,
                                                        sess=self.sess_train, last_performance=last_performance)
 
-    def eval(self):
+    def eval(self): # TODO: Pass writer_dict for tensorboard when training
         ckpt_path = self.__restore_model(self.saver_eval, self.sess_eval)
         tf.logging.info('restore from %s' % (ckpt_path))
         print("Starting evaluation process")
@@ -154,13 +154,14 @@ class Trainer():
             all_targets.append([x for x in labels])
             all_ids.append([x for x in ids])
 
-        perf_indicator = validate(self.hrnet.cfg, self.dataset_eval, outputs=all_logits,
+        name_values, perf_indicator = validate(self.hrnet.cfg, self.dataset_eval, outputs=all_logits,
                                   targets=all_targets,
                                   ids=all_ids,
                                   output_dir=self.log_path, writer_dict=None)
 
         # TODO: Extend in case of more metrics added beyond loss
         tf.logging.info('%s = %.4e' % ('loss', np.mean(eval_rslts)))
+        tf.logging.info('%s = %.4e' % ('AP', perf_indicator))
 
         return perf_indicator
 
