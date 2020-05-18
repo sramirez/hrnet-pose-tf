@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 Evaluation requires: (batch_size, height, width, channels)
 Metadata information is retrieved from dataset.augmented_db.
 """
+
+
 def validate(config, dataset, outputs, targets, ids, output_dir, writer_dict=None):
     losses = AverageMeter()
     acc = AverageMeter()
@@ -44,7 +46,7 @@ def validate(config, dataset, outputs, targets, ids, output_dir, writer_dict=Non
         meta = [dataset.augmented_db[str(i)] for i in id]
         # measure accuracy and record loss
         o = np.array([x.transpose(2, 0, 1) for x in output])
-        _, avg_acc, cnt, pred = accuracy(o, np.array([x.transpose(2, 0, 1) for x in target]))
+        _, avg_acc, cnt, _ = accuracy(o, np.array([x.transpose(2, 0, 1) for x in target]))
         acc.update(avg_acc, cnt)
         c = np.array([x['center'] for x in meta])
         s = np.array([x['scale'] for x in meta])
@@ -69,6 +71,13 @@ def validate(config, dataset, outputs, targets, ids, output_dir, writer_dict=Non
     else:
         _print_name_value(name_values, model_name)
 
+    # Update logging dictionary with accuracy and loss information
+    _update_dict(losses, acc, name_values, writer_dict)
+
+    return name_values, perf_indicator
+
+
+def _update_dict(self, losses, acc, name_values, writer_dict=None):
     if writer_dict:
         writer = writer_dict['writer']
         global_steps = writer_dict['valid_global_steps']
@@ -96,8 +105,6 @@ def validate(config, dataset, outputs, targets, ids, output_dir, writer_dict=Non
                 global_steps
             )
         writer_dict['valid_global_steps'] = global_steps + 1
-
-    return perf_indicator
 
 # markdown format output
 def _print_name_value(name_value, full_arch_name):
