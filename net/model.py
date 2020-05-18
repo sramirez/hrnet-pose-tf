@@ -46,7 +46,6 @@ class HRNet():
         return final_output
 
     def forward_eval(self, eval_input):
-        # TODO: generate flipped version of eval_input, forward both and mix them up.
         batch_norm_params = {'epsilon': 1e-5,
                              'scale': True,
                              'is_training': False,

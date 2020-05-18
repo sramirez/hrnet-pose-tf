@@ -22,6 +22,11 @@ from datasets.joints_dataset import joints_dataset
 logger = logging.getLogger(__name__)
 
 # TODO: do validation with flip
+# https://github.com/HRNet/HRNet-Human-Pose-Estimation/blob/00d7bf72f56382165e504b10ff0dddb82dca6fd2/lib/core/function.py
+""" Validate with mAP. Original shape from net output (batch_size, height, width, channels).
+Evaluation requires: (batch_size, height, width, channels)
+Metadata information is retrieved from dataset.augmented_db.
+"""
 def validate(config, dataset, outputs, targets, ids, output_dir, writer_dict=None):
     losses = AverageMeter()
     acc = AverageMeter()
@@ -33,66 +38,64 @@ def validate(config, dataset, outputs, targets, ids, output_dir, writer_dict=Non
     all_boxes = np.zeros((num_samples, 6))
     image_path = []
     idx = 0
-    for i, (output, target, id) in enumerate(zip(outputs, targets, ids)):
+    for i, (output, target, id) in enumerate(zip(outputs, targets, ids)): # output is a list of batches
 
-        num_images = output.size(0)
-        meta = dataset.augmented_db[str(id)]
+        num_images_b = len(output)
+        meta = [dataset.augmented_db[str(i)] for i in id]
         # measure accuracy and record loss
-        _, avg_acc, cnt, pred = accuracy(output,
-                                         target)
+        o = np.array([x.transpose(2, 0, 1) for x in output])
+        _, avg_acc, cnt, pred = accuracy(o, np.array([x.transpose(2, 0, 1) for x in target]))
         acc.update(avg_acc, cnt)
-        c = meta['center'].numpy()
-        s = meta['scale'].numpy()
-        score = meta['score'].numpy()
-        preds, maxvals = get_final_preds(config, output.numpy(), c, s)
+        c = np.array([x['center'] for x in meta])
+        s = np.array([x['scale'] for x in meta])
+        score = np.array([x['score'] for x in meta])
+        preds, maxvals = get_final_preds(config, o, c, s)
 
-        # Prepare final data structure
-        all_preds[idx:idx + num_images, :, 0:2] = preds[:, :, 0:2]
-        all_preds[idx:idx + num_images, :, 2:3] = maxvals
+        all_preds[idx:idx + num_images_b, :, 0:2] = preds[:, :, 0:2]
+        all_preds[idx:idx + num_images_b, :, 2:3] = maxvals
         # double check this all_boxes parts
-        all_boxes[idx:idx + num_images, 0:2] = c[:, 0:2]
-        all_boxes[idx:idx + num_images, 2:4] = s[:, 0:2]
-        all_boxes[idx:idx + num_images, 4] = np.prod(s * 200, 1)
-        all_boxes[idx:idx + num_images, 5] = score
+        all_boxes[idx:idx + num_images_b, 0:2] = c[:, 0:2]
+        all_boxes[idx:idx + num_images_b, 2:4] = s[:, 0:2]
+        all_boxes[idx:idx + num_images_b, 4] = np.prod(s * 200, 1)
+        all_boxes[idx:idx + num_images_b, 5] = score
+        image_path.extend(np.array([x['image'] for x in meta]))
 
-        idx += num_images
-        image_path.extend(meta['image'])
-        name_values, perf_indicator = dataset.evaluate(all_preds, output_dir, all_boxes, image_path)
+    name_values, perf_indicator = dataset.evaluate(all_preds, output_dir, all_boxes, image_path)
 
-        model_name = config['MODEL']['name']
+    model_name = config['MODEL']['name']
+    if isinstance(name_values, list):
+        for name_value in name_values:
+            _print_name_value(name_value, model_name)
+    else:
+        _print_name_value(name_values, model_name)
+
+    if writer_dict:
+        writer = writer_dict['writer']
+        global_steps = writer_dict['valid_global_steps']
+        writer.add_scalar(
+            'valid_loss',
+            losses.avg,
+            global_steps
+        )
+        writer.add_scalar(
+            'valid_acc',
+            acc.avg,
+            global_steps
+        )
         if isinstance(name_values, list):
             for name_value in name_values:
-                _print_name_value(name_value, model_name)
-        else:
-            _print_name_value(name_values, model_name)
-
-        if writer_dict:
-            writer = writer_dict['writer']
-            global_steps = writer_dict['valid_global_steps']
-            writer.add_scalar(
-                'valid_loss',
-                losses.avg,
-                global_steps
-            )
-            writer.add_scalar(
-                'valid_acc',
-                acc.avg,
-                global_steps
-            )
-            if isinstance(name_values, list):
-                for name_value in name_values:
-                    writer.add_scalars(
-                        'valid',
-                        dict(name_value),
-                        global_steps
-                    )
-            else:
                 writer.add_scalars(
                     'valid',
-                    dict(name_values),
+                    dict(name_value),
                     global_steps
                 )
-            writer_dict['valid_global_steps'] = global_steps + 1
+        else:
+            writer.add_scalars(
+                'valid',
+                dict(name_values),
+                global_steps
+            )
+        writer_dict['valid_global_steps'] = global_steps + 1
 
     return perf_indicator
 

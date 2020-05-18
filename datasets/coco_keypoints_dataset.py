@@ -8,7 +8,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from collections import defaultdict
 from collections import OrderedDict
 import logging
 import os
@@ -20,8 +19,6 @@ import numpy as np
 import tensorflow as tf
 
 from datasets.joints_dataset import joints_dataset
-from nms.nms import oks_nms
-from nms.nms import soft_oks_nms
 
 logger = logging.getLogger(__name__)
 
@@ -126,16 +123,6 @@ class coco_keypoints_dataset(joints_dataset):
         for (i, (input, target, _, _)) in enumerate(self):
             yield input, target, i
 
-    def db_generator_subset(self):
-        size = max(1, min(10, len(self.db))) # TODO: change subsetting = 10
-        print("Size: " + str(size))
-        i = 0
-        while i < size:
-            input, target, _, meta = self[i]
-            i += 1
-            print(i - 1)
-            yield input, target, i - 1
-
     def build(self):
         """Make an iterator from self.db
 
@@ -145,7 +132,7 @@ class coco_keypoints_dataset(joints_dataset):
         input, target, _, meta = self[0]
         shapes = (np.shape(input), np.shape(target), ())
         dataset = tf.data.Dataset.from_generator(self.db_generator, (tf.float32, tf.float32, tf.uint8), output_shapes=shapes)
-        dataset = dataset.shuffle(buffer_size=10).repeat() # TODO: set old buffer_size = self.cfg['COMMON']['buffer_size']
+        dataset = dataset.shuffle(buffer_size=self.cfg['COMMON']['buffer_size']).repeat()
         dataset = dataset.batch(self.batch_size)
         dataset = dataset.prefetch(self.cfg['COMMON']['prefetch_size'])
         iterator = dataset.make_one_shot_iterator()
@@ -154,8 +141,7 @@ class coco_keypoints_dataset(joints_dataset):
 
     def _get_ann_file_keypoint(self):
         """ self.root / annotations / person_keypoints_train2017.json """
-        prefix = 'person_keypoints' \
-            if 'test' not in self.image_set else 'image_info'
+        prefix = 'person_keypoints' if 'test' not in self.image_set else 'image_info'
         return os.path.join(
             self.root,
             'annotations',
@@ -164,7 +150,7 @@ class coco_keypoints_dataset(joints_dataset):
 
     def _load_image_set_index(self):
         """ image id: int """
-        image_ids = self.coco.getImgIds()
+        image_ids = self.coco.getImgIds()[:10] # TODO: remove subsetting
         return image_ids
 
     def _get_db(self):
@@ -325,7 +311,7 @@ class coco_keypoints_dataset(joints_dataset):
         return kpt_db
 
     def evaluate(self, preds, output_dir, all_boxes, img_path):
-        oks_kpts = self.super.evaluate(preds, output_dir, all_boxes, img_path)
+        oks_kpts = super(coco_keypoints_dataset, self).evaluate(preds, output_dir, all_boxes, img_path)
         res_folder = os.path.join(output_dir, 'results')
         res_file = os.path.join(
             res_folder, 'keypoints_{}_results_{}.json'.format(
@@ -333,7 +319,7 @@ class coco_keypoints_dataset(joints_dataset):
         )
         self._write_coco_keypoint_results(oks_kpts, res_file)
         if 'test' not in self.image_set:
-            info_str = self._do_python_keypoint_eval(res_file, res_folder)
+            info_str = self._do_python_keypoint_eval(res_file)
             name_value = OrderedDict(info_str)
             return name_value, name_value['AP']
         else:
