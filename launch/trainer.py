@@ -22,7 +22,7 @@ class Trainer():
         self.hrnet = HRNet(netcfg)
         # initialize training & evaluation subsets
         #self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
-        #                                            FLAGS.test_path, True) # TODO: change test_path by test_path
+        #                                            FLAGS.train_path, True) # TODO: uncomment and change test_path by test_path
         self.dataset_eval = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
                                                    FLAGS.test_path, False)
 
@@ -37,9 +37,7 @@ class Trainer():
     def build_graph(self, is_train):
         with tf.Graph().as_default():
             # TensorFlow session
-            config = tf.ConfigProto( # TODO: remove before launching on server
-                device_count = {'GPU': 0}
-            )
+            config = tf.ConfigProto()
             config.gpu_options.visible_device_list = str(
                 mgw.local_rank() if FLAGS.enbl_multi_gpu else 0)  # pylint: disable=no-member
             sess = tf.Session(config=config)
@@ -144,19 +142,25 @@ class Trainer():
         tf.logging.info('restore from %s' % (ckpt_path))
         print("Starting evaluation process")
         # eval
-        #nb_iters = int(np.ceil(float(self.dataset_eval.num_images) / FLAGS.batch_size)) # TODO: set old value
-        nb_iters = 3
+        nb_iters = int(np.ceil(float(self.dataset_eval.num_images) / FLAGS.batch_size))
         eval_rslts = np.zeros((nb_iters, 1))
-
+        all_logits = []
+        all_targets = []
+        all_ids = []
         for idx_iter in range(nb_iters):
-            logits, labels, ids, loss = self.sess_eval.run(self.eval_op) # TODO: logits and labels only return a single instance, batch size: 2
+            logits, labels, ids, loss = self.sess_eval.run(self.eval_op)
             eval_rslts[idx_iter] = loss
+            all_logits.append([x for x in logits])
+            all_targets.append([x for x in labels])
+            all_ids.append([x for x in ids])
 
-        perf_indicator = validate(self.hrnet.cfg, self.dataset_eval, outputs=logits, targets=labels, ids=ids,
+        perf_indicator = validate(self.hrnet.cfg, self.dataset_eval, outputs=all_logits,
+                                  targets=all_targets,
+                                  ids=all_ids,
                                   output_dir=self.log_path, writer_dict=None)
 
-        for idx, name in enumerate(self.eval_op_names):
-            tf.logging.info('%s = %.4e' % (name, np.mean(eval_rslts[:, idx])))
+        # TODO: Extend in case of more metrics added beyond loss
+        tf.logging.info('%s = %.4e' % ('loss', np.mean(eval_rslts)))
 
         return perf_indicator
 
