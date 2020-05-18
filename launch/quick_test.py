@@ -8,7 +8,7 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_bool('enbl_multi_gpu', False, 'Enable training with multiple gpus')
 tf.app.flags.DEFINE_string('data_path', './data/tfrecord', 'path to data tfrecords')
-tf.app.flags.DEFINE_string('net_cfg', '../cfgs/w30_s4.cfg', 'config file of network')
+tf.app.flags.DEFINE_string('net_cfg', './cfgs/w30_s4.cfg', 'config file of network')
 tf.app.flags.DEFINE_bool('eval_only', False, 'Eval mode')
 tf.app.flags.DEFINE_bool('resume_training', False, 'resume training')
 
@@ -37,7 +37,7 @@ def quick_test():
 
 def full_test():
     cfg = config.load_net_cfg_from_file(FLAGS.net_cfg)
-    coco = coco_keypoints_dataset(cfg, "../data/coco/", FLAGS.test_path, False)
+    coco = coco_keypoints_dataset(cfg, "./data/coco/", FLAGS.test_path, False)
     inputs = coco.build(subset=10)
     images, labels = inputs.get_next()
     model = HRNet(FLAGS.net_cfg)
