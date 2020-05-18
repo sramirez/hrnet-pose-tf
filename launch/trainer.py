@@ -22,7 +22,7 @@ class Trainer():
         self.hrnet = HRNet(netcfg)
         # initialize training & evaluation subsets
         self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
-                                                    FLAGS.train_path, True)
+                                                    FLAGS.test_path, True)
         self.dataset_eval = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
                                                    FLAGS.test_path, False)
 

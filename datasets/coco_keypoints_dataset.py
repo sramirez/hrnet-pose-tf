@@ -150,7 +150,7 @@ class coco_keypoints_dataset(joints_dataset):
 
     def _load_image_set_index(self):
         """ image id: int """
-        image_ids = self.coco.getImgIds()
+        image_ids = self.coco.getImgIds()[:100]
         return image_ids
 
     def _get_db(self):
