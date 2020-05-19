@@ -7,8 +7,8 @@ from netutils.config import load_net_cfg_from_file
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_bool('enbl_multi_gpu', False, 'Enable training with multiple gpus')
-tf.app.flags.DEFINE_string('data_path', 'data/coco', 'path to data tfrecords')
-tf.app.flags.DEFINE_string('bbox_file', "data/coco/person_detection_results/COCO_val2017_detections_AP_H_56_person.json",
+tf.app.flags.DEFINE_string('data_path', './data/coco', 'path to data tfrecords')
+tf.app.flags.DEFINE_string('bbox_file', "./data/coco/person_detection_results/COCO_val2017_detections_AP_H_56_person.json",
                            "JSON full filepath for the boxes detection for the evaluation set") # Train detections are taken from the ground truth
 tf.app.flags.DEFINE_string('train_path', "train2017", "Subfolder inside datapath for training examples")
 tf.app.flags.DEFINE_string('test_path', "val2017", "Subfolder inside datapath for validation examples")
