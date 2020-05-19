@@ -104,6 +104,7 @@ class Trainer():
         # initialization
         self.sess_train.run(self.init_op)
         if FLAGS.resume_training:
+            print("Model path: " + self.model_path + '/model.ckpt')
             save_path = tf.train.latest_checkpoint(os.path.dirname(self.model_path + '/model.ckpt'))
             if FLAGS.load_head_weights:
                 # check if saver will restore only some layers
