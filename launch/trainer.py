@@ -39,7 +39,7 @@ class Trainer():
             # TensorFlow session
             config = tf.ConfigProto()
             config.gpu_options.visible_device_list = str(
-                mgw.local_rank() if FLAGS.enbl_multi_gpu else 1)  # pylint: disable=no-member
+                mgw.local_rank() if FLAGS.enbl_multi_gpu else 0)  # pylint: disable=no-member
             sess = tf.Session(config=config)
 
             # data input pipeline
