@@ -29,7 +29,7 @@ FLAGS = tf.app.flags.FLAGS
 It process and generate metada for all images in the dataset
 The structure is the following:
 {
-    'image': self._image_path_from_index(index),
+    'image': coco_url,
     'center': center,
     'scale': scale,
     'joints_3d': joints_3d,
@@ -225,7 +225,7 @@ class coco_keypoints_dataset(joints_dataset):
 
             center, scale = self._box2cs(obj['clean_bbox'][:4])
             rec.append({
-                'image': self._image_path_from_index(index),
+                'image': im_ann['coco_url'],
                 'center': center,
                 'scale': scale,
                 'joints_3d': joints_3d,
@@ -257,21 +257,6 @@ class coco_keypoints_dataset(joints_dataset):
 
         return center, scale
 
-    def _image_path_from_index(self, index):
-        """ example: images / train2017 / 000000119993.jpg """
-        file_name = '%012d.jpg' % index
-        if '2014' in self.image_set:
-            file_name = 'COCO_%s_' % self.image_set + file_name
-
-        prefix = 'test2017' if 'test' in self.image_set else self.image_set
-
-        data_name = prefix + '.zip@' if self.data_format == 'zip' else prefix
-
-        image_path = os.path.join(
-            self.root, 'images', data_name, file_name)
-
-        return image_path
-
     def _load_coco_person_detection_results(self):
         try:
             with open(self.bbox_file, 'r') as f:
@@ -286,7 +271,8 @@ class coco_keypoints_dataset(joints_dataset):
         for det_res in all_boxes:
             if det_res['category_id'] != 1:
                 continue
-            img_name = self._image_path_from_index(det_res['image_id'])
+            info = self.coco.loadImgs(det_res['image_id'])[0]
+            img_name = info['coco_url']
             box = det_res['bbox']
             score = det_res['score']
             if score < self.image_thre:

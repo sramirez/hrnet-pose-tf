@@ -14,7 +14,6 @@ import random
 
 import cv2
 import numpy as np
-import tensorflow as tf
 
 from netutils.transforms import get_affine_transform
 from netutils.transforms import affine_transform
@@ -136,7 +135,7 @@ class joints_dataset():
     def __getitem__(self, idx):
         db_rec = copy.deepcopy(self.db[idx])
 
-        image_file = db_rec['coco_url']
+        image_file = db_rec['image']
         filename = db_rec['filename'] if 'filename' in db_rec else ''
         imgnum = db_rec['imgnum'] if 'imgnum' in db_rec else ''
 
