@@ -258,7 +258,7 @@ class coco_keypoints_dataset(joints_dataset):
         return center, scale
 
     def _image_path_from_index(self, index):
-        """ example: images (or data_name in kaggle) / train2017 / 000000119993.jpg """
+        """ example: images / train2017 / 000000119993.jpg """
         file_name = '%012d.jpg' % index
         if '2014' in self.image_set:
             file_name = 'COCO_%s_' % self.image_set + file_name
@@ -268,7 +268,7 @@ class coco_keypoints_dataset(joints_dataset):
         data_name = prefix + '.zip@' if self.data_format == 'zip' else prefix
 
         image_path = os.path.join(
-            self.root, data_name, data_name, file_name)
+            self.root, 'images', data_name, file_name)
 
         return image_path
 

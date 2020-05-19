@@ -8,7 +8,7 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_bool('enbl_multi_gpu', False, 'Enable training with multiple gpus')
 tf.app.flags.DEFINE_string('data_path', './data/coco', 'path to data tfrecords')
-tf.app.flags.DEFINE_string("annotations_path", "annotations_trainval2017/annotations/", 'annotation subfolder path')
+tf.app.flags.DEFINE_string("annotations_path", "annotations", 'annotation subfolder path')
 tf.app.flags.DEFINE_string('bbox_file', "./data/coco/person_detection_results/COCO_val2017_detections_AP_H_56_person.json",
                            "JSON full filepath for the boxes detection for the evaluation set") # Train detections are taken from the ground truth
 tf.app.flags.DEFINE_string('train_path', "train2017", "Subfolder inside datapath for training examples")
