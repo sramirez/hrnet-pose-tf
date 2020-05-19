@@ -28,8 +28,8 @@ class Trainer():
 
         # learning rate
         self.lr_init = self.hrnet.cfg['COMMON']['lr_rate_init']
-        self.model_path = '../models'
-        self.log_path = '../logs'
+        self.model_path = './models'
+        self.log_path = './logs'
         self.summ_step = self.hrnet.cfg['COMMON']['summary_step']
         self.save_step = self.hrnet.cfg['COMMON']['save_step']
         self.nb_iters_start = 0
