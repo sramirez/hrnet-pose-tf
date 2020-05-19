@@ -39,7 +39,7 @@ class Trainer():
             # TensorFlow session
             config = tf.ConfigProto()
             config.gpu_options.visible_device_list = str(
-                mgw.local_rank() if FLAGS.enbl_multi_gpu else 0)  # pylint: disable=no-member
+                mgw.local_rank() if FLAGS.enbl_multi_gpu else 1)  # pylint: disable=no-member
             sess = tf.Session(config=config)
 
             # data input pipeline
@@ -172,9 +172,9 @@ class Trainer():
     def setup_lrn_rate(self, global_step):
         """Setup the learning rate (and number of training iterations)."""
 
-        nb_epochs = 100
-        idxs_epoch = [30, 60, 90]
-        decay_rates = [1.0, 0.1, 0.01, 0.001]
+        nb_epochs = 210 # TODO: move all this to the configuration file
+        idxs_epoch = [170, 200]
+        decay_rates = [1.0, 0.1, 0.01] # decay from original
         nb_epochs_rat = 1.0
         batch_size = FLAGS.batch_size * (1 if not FLAGS.enbl_multi_gpu else mgw.size())
         lrn_rate = setup_lrn_rate_piecewise_constant(global_step, self.lr_init, batch_size,
