@@ -14,7 +14,6 @@ import random
 
 import cv2
 import numpy as np
-import tensorflow as tf
 
 from netutils.transforms import get_affine_transform
 from netutils.transforms import affine_transform
@@ -25,6 +24,7 @@ from collections import OrderedDict
 import os
 from nms.nms import oks_nms
 from nms.nms import soft_oks_nms
+import skimage.io as io
 
 
 logger = logging.getLogger(__name__)
@@ -146,9 +146,7 @@ class joints_dataset():
                 image_file, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION
             )
         else:
-            data_numpy = cv2.imread(
-                image_file, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION
-            )
+            data_numpy = io.imread(image_file)
 
         if self.color_rgb:
             data_numpy = cv2.cvtColor(data_numpy, cv2.COLOR_BGR2RGB)
