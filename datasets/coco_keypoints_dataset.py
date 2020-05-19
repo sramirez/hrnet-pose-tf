@@ -140,11 +140,11 @@ class coco_keypoints_dataset(joints_dataset):
         return iterator
 
     def _get_ann_file_keypoint(self):
-        """ self.root / annotations / person_keypoints_train2017.json """
+        """ self.root / FLAGS.annotations_path / person_keypoints_train2017.json """
         prefix = 'person_keypoints' if 'test' not in self.image_set else 'image_info'
         return os.path.join(
             self.root,
-            'annotations',
+            FLAGS.annotations_path,
             prefix + '_' + self.image_set + '.json'
         )
 
