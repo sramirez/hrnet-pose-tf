@@ -146,9 +146,10 @@ class joints_dataset():
             )
         else:
             import skimage.color as color
-            data_numpy = io.imread(image_file)[..., ::-1]
+            data_numpy = io.imread(image_file)
             if len(data_numpy.shape) == 2:
                 data_numpy = color.gray2rgb(data_numpy)
+            data_numpy = data_numpy[..., ::-1]
 
         print("File: " + str(image_file))
         print("Shape: " + str(data_numpy.shape))
