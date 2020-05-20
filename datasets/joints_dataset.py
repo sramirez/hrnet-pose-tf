@@ -146,6 +146,7 @@ class joints_dataset():
             )
         else:
             data_numpy = io.imread(image_file)[..., ::-1]
+        print("File: " + str(image_file))
         print("Shape: " + str(data_numpy.shape))
 
         if self.color_rgb:
