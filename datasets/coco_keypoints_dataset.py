@@ -257,6 +257,9 @@ class coco_keypoints_dataset(joints_dataset):
 
         return center, scale
 
+    """ Beware! This method only load bbox information and leaves keypoint info unfilled.
+        Keypoint info is used to generate target, so it is mandatory!.
+    """
     def _load_coco_person_detection_results(self):
         try:
             with open(self.bbox_file, 'r') as f:
