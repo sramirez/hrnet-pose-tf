@@ -145,7 +145,7 @@ class joints_dataset():
                 image_file, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION
             )
         else:
-            data_numpy = io.imread(image_file)
+            data_numpy = io.imread(image_file)[..., ::-1]
 
         if self.color_rgb:
             data_numpy = cv2.cvtColor(data_numpy, cv2.COLOR_BGR2RGB)
