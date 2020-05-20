@@ -195,6 +195,7 @@ class joints_dataset():
             flags=cv2.INTER_LINEAR)
 
         if self.normalize:
+            input = input / 255.0
             input = (input - self.norm_mean) / self.norm_std
 
         for i in range(self.num_joints):
