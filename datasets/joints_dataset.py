@@ -145,7 +145,11 @@ class joints_dataset():
                 image_file, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION
             )
         else:
+            import skimage.color as color
             data_numpy = io.imread(image_file)[..., ::-1]
+            if len(data_numpy.shape) == 2:
+                data_numpy = color.gray2rgb(data_numpy)
+
         print("File: " + str(image_file))
         print("Shape: " + str(data_numpy.shape))
 
