@@ -23,8 +23,14 @@ class Trainer():
         # initialize training & evaluation subsets
         self.dataset_train = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
                                                     FLAGS.test_path, True)
+
+
         self.dataset_eval = coco_keypoints_dataset(self.hrnet.cfg, FLAGS.data_path,
                                                    FLAGS.test_path, False)
+
+        for input, target, asd, meta in self.dataset_eval:
+            if not target.any():
+                print("All zeros")
 
         # learning rate
         self.lr_init = self.hrnet.cfg['COMMON']['lr_rate_init']

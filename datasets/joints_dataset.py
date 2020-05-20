@@ -133,7 +133,6 @@ class joints_dataset():
     def __len__(self,):
         return len(self.db)
 
-
     def __getitem__(self, idx):
         db_rec = copy.deepcopy(self.db[idx])
 
