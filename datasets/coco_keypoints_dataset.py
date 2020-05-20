@@ -230,11 +230,26 @@ class coco_keypoints_dataset(joints_dataset):
                 'scale': scale,
                 'joints_3d': joints_3d,
                 'joints_3d_vis': joints_3d_vis,
-                'filename': '',
+                'filename': self._image_path_from_index(index),
                 'imgnum': 0,
             })
 
         return rec
+
+    def _image_path_from_index(self, index):
+        """ example: images / train2017 / 000000119993.jpg """
+        file_name = '%012d.jpg' % index
+        if '2014' in self.image_set:
+            file_name = 'COCO_%s_' % self.image_set + file_name
+
+        prefix = 'test2017' if 'test' in self.image_set else self.image_set
+
+        data_name = prefix + '.zip@' if self.data_format == 'zip' else prefix
+
+        image_path = os.path.join(
+            self.root, 'images', data_name, file_name)
+
+        return image_path
 
     def _box2cs(self, box):
         x, y, w, h = box[:4]
@@ -284,12 +299,14 @@ class coco_keypoints_dataset(joints_dataset):
                 (self.num_joints, 3), dtype=np.float)
 
             kpt_db.append({
+                'filename': self._image_path_from_index(det_res['image_id']),
                 'image': img_name,
                 'center': center,
                 'scale': scale,
                 'score': score,
                 'joints_3d': joints_3d,
                 'joints_3d_vis': joints_3d_vis,
+
             })
 
         logger.info('=> Total boxes after filtering low score@{}: {}'.format(
