@@ -146,6 +146,7 @@ class joints_dataset():
             )
         else:
             data_numpy = io.imread(image_file)[..., ::-1]
+        print("Shape: " + str(data_numpy.shape))
 
         if self.color_rgb:
             data_numpy = cv2.cvtColor(data_numpy, cv2.COLOR_BGR2RGB)
@@ -192,6 +193,7 @@ class joints_dataset():
             (int(self.image_size[0]), int(self.image_size[1])),
             flags=cv2.INTER_LINEAR)
 
+        input = input / 255.0
         if self.normalize:
             input = (input - self.norm_mean) / self.norm_std
 
